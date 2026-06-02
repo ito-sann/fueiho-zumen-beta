@@ -7,8 +7,8 @@
 
   /* 求積のルール:
    *   ・寸法(辺の長さ)は m 表記・小数第2位(cm 単位)
-   *   ・各基本図形の面積の「計算過程」は小数第4位まで
-   *   ・求積表/図面に載せる最終面積は小数第2位
+   *   ・各部屋(基本図形)の面積は小数第4位まで
+   *   ・最後の合計(総面積)だけ小数第2位
    */
   function round4(n) { return Math.round(n * 10000) / 10000; }
   function round2(n) { return Math.round(n * 100) / 100; }
@@ -23,18 +23,17 @@
   }
 
   /* 1区画(長方形)の求積計算
-   *   辺(第2位) × 辺(第2位) = 計算過程(第4位) → 最終面積(第2位) */
+   *   辺(第2位) × 辺(第2位) = 部屋の面積(第4位) */
   function regionCalc(region) {
-    const wM = mmToM(region.w);          // 例: 3.20
-    const hM = mmToM(region.h);          // 例: 4.50
-    const areaCalc = round4(wM * hM);    // 計算過程: 第4位まで(例 14.4000)
-    const areaFinal = round2(areaCalc);  // 最終表記: 第2位(例 14.40)
-    return { wM, hM, areaCalc, areaFinal };
+    const wM = mmToM(region.w);          // 例: 3.25
+    const hM = mmToM(region.h);          // 例: 4.51
+    const area4 = round4(wM * hM);       // 部屋の面積: 第4位まで(例 14.6575)
+    return { wM, hM, area4 };
   }
 
-  /* 長方形区画の最終面積(㎡・小数第2位) */
+  /* 長方形区画の面積(㎡・小数第4位) */
   function regionAreaSqm(region) {
-    return regionCalc(region).areaFinal;
+    return regionCalc(region).area4;
   }
 
   /* 1区画 → 求積表の1行 */
@@ -42,20 +41,19 @@
     const c = regionCalc(region);
     const wStr = c.wM.toFixed(2);
     const hStr = c.hM.toFixed(2);
-    const calcStr = c.areaCalc.toFixed(4); // 計算過程(第4位)
     return {
       id: region.id,
       label: region.label,
       type: region.type,
       w: wStr, h: hStr,
-      formula: `${wStr} × ${hStr} = ${calcStr}`,
-      areaCalc: c.areaCalc,   // 合計の集計に使う(第4位の値)
-      area: c.areaFinal,      // 最終表記(第2位)
+      expr: `${wStr} × ${hStr}`,            // 計算式(辺×辺)
+      formula: `${wStr} × ${hStr} = ${c.area4.toFixed(4)}`,
+      area: c.area4,        // 部屋の面積(第4位)
     };
   }
 
   /* 種類でフィルタした求積表(行 + 合計)
-   * 合計は各図形の計算過程(第4位)を足し込み、最後に第2位へ丸める。 */
+   * 各部屋は第4位。合計は第4位の値を足し込み、最後に第2位へ丸める(総面積)。 */
   function buildTable(project, filterTypes) {
     const rows = [];
     let totalCalc = 0;
@@ -63,7 +61,7 @@
       if (filterTypes && filterTypes.indexOf(r.type) < 0) continue;
       const row = regionRow(r);
       rows.push(row);
-      totalCalc += row.areaCalc;
+      totalCalc += row.area;
     }
     return { rows, total: round2(totalCalc) };
   }
