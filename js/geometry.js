@@ -86,6 +86,9 @@
     for (const f of project.furniture) {
       consider(f.x, f.y); consider(f.x + f.w, f.y + f.h);
     }
+    for (const g of (project.fittings || [])) {
+      consider(g.x, g.y); consider(g.x + g.w, g.y + g.h);
+    }
     for (const x of project.fixtures) {
       consider(x.x, x.y);
     }

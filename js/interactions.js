@@ -25,6 +25,10 @@
       const r = 12 / global.Render.view.zoom;
       if (Math.hypot(wx - x.x, wy - x.y) <= r) return x;
     }
+    const fittings = project.fittings || [];
+    for (let i = fittings.length - 1; i >= 0; i--) {
+      if (inRotatedRect(wx, wy, fittings[i])) return fittings[i];
+    }
     for (let i = project.furniture.length - 1; i >= 0; i--) {
       if (inRotatedRect(wx, wy, project.furniture[i])) return project.furniture[i];
     }

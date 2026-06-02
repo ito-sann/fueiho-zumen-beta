@@ -62,6 +62,10 @@
     for (const [key, v] of Object.entries(M.FURNITURE_CATALOG)) {
       fk.add(new Option(`${v.label}(${v.w}×${v.h})`, key));
     }
+    const gk = $('fittingKind');
+    for (const [key, v] of Object.entries(M.FITTING_CATALOG)) {
+      gk.add(new Option(v.label, key));
+    }
     const xk = $('fixKind');
     for (const [key, v] of Object.entries(M.FIXTURE_CATALOG)) {
       xk.add(new Option(v.label, key));
@@ -100,6 +104,12 @@
       placeAtViewCenter(f);
       state.selectedId = f.id;
       refresh(); showProps(f);
+    };
+    $('btnAddFitting').onclick = () => {
+      const g = M.addFitting(project, $('fittingKind').value);
+      placeAtViewCenter(g);
+      state.selectedId = g.id;
+      refresh(); showProps(g);
     };
     $('btnAddFix').onclick = () => {
       const x = M.addFixture(project, $('fixKind').value);
@@ -234,9 +244,9 @@
     html += propText('ラベル', 'label', el.label);
     html += propNum('X位置(mm)', 'x', el.x);
     html += propNum('Y位置(mm)', 'y', el.y);
-    if (kind === 'regions' || kind === 'furniture') {
-      html += propNum('幅(mm)', 'w', el.w);
-      html += propNum('奥行(mm)', 'h', el.h);
+    if (kind === 'regions' || kind === 'furniture' || kind === 'fittings') {
+      html += propNum(kind === 'fittings' ? '長さ(mm)' : '幅(mm)', 'w', el.w);
+      html += propNum(kind === 'fittings' ? '厚み(mm)' : '奥行(mm)', 'h', el.h);
       html += propNum('角度(度)', 'rotation', el.rotation || 0);
     }
     if (kind === 'furniture') {
@@ -272,6 +282,7 @@
   function kindLabel(el, kind) {
     if (kind === 'regions') return (M.REGION_TYPES[el.type] || {}).label || '区画';
     if (kind === 'furniture') return '備品';
+    if (kind === 'fittings') return '建具・設備';
     return '照明・音響';
   }
   function propText(label, field, val) {

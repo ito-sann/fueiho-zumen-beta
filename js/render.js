@@ -158,6 +158,73 @@
     ctx.restore();
   }
 
+  /* 建具・設備(出入口・扉・窓・壁・柱)を製図記号で描く */
+  function drawFitting(ctx, g, opts) {
+    const sc = worldToScreen(g.x + g.w / 2, g.y + g.h / 2);
+    const w = g.w * view.zoom, h = g.h * view.zoom;
+    const sel = opts.selected;
+    ctx.save();
+    ctx.translate(sc.x, sc.y);
+    ctx.rotate((g.rotation || 0) * Math.PI / 180);
+    ctx.lineWidth = sel ? 3 : 1.5;
+    const line = sel ? '#d32f2f' : '#37474f';
+
+    if (g.kind === 'wall') {
+      ctx.fillStyle = sel ? 'rgba(211,47,47,.85)' : '#546e7a';
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+    } else if (g.kind === 'pillar') {
+      ctx.fillStyle = sel ? 'rgba(211,47,47,.85)' : '#455a64';
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.strokeStyle = '#263238';
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+    } else if (g.kind === 'window') {
+      // 枠 + 二重線(ガラス)
+      ctx.strokeStyle = sel ? '#d32f2f' : '#1565c0';
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h * 0.16); ctx.lineTo(w / 2, -h * 0.16);
+      ctx.moveTo(-w / 2, h * 0.16);  ctx.lineTo(w / 2, h * 0.16);
+      ctx.stroke();
+    } else if (g.kind === 'door') {
+      // 開口の下枠 + 扉の葉 + 開閉軌跡(円弧)
+      const hx = -w / 2; // ヒンジ(左端)
+      ctx.strokeStyle = line;
+      ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(w / 2, 0); ctx.stroke(); // 開口
+      ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx, -w); ctx.stroke();       // 葉(開いた状態)
+      ctx.beginPath(); ctx.arc(hx, 0, w, -Math.PI / 2, 0); ctx.stroke();          // 軌跡
+    } else if (g.kind === 'entrance') {
+      // 開口(両端のジャム)+ 出入りの両矢印 + ラベル
+      ctx.strokeStyle = line;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(-w / 2, h / 2);
+      ctx.moveTo(w / 2, -h / 2);  ctx.lineTo(w / 2, h / 2);
+      ctx.stroke();
+      arrow(ctx, -w / 2 + 2, 0, w / 2 - 2, 0); // 両矢印
+      ctx.fillStyle = line;
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('出入口', 0, h / 2 + 2);
+    }
+    ctx.restore();
+  }
+
+  /* 簡易の両矢印(始点・終点に三角) */
+  function arrow(ctx, x1, y1, x2, y2) {
+    const a = Math.atan2(y2 - y1, x2 - x1);
+    const head = 5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    const tip = (x, y, dir) => {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - head * Math.cos(a - 0.4) * dir, y - head * Math.sin(a - 0.4) * dir);
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - head * Math.cos(a + 0.4) * dir, y - head * Math.sin(a + 0.4) * dir);
+      ctx.stroke();
+    };
+    tip(x2, y2, 1); tip(x1, y1, -1);
+  }
+
   function drawFixture(ctx, x, opts) {
     const p = worldToScreen(x.x, x.y);
     const r = 10;
@@ -209,19 +276,19 @@
     switch (layer) {
       case 'plan':
         return { regionsFill: true, allRegions: true, regionTypes: null,
-                 furniture: true, fixtures: false, dims: true, table: false };
+                 furniture: true, fittings: true, fixtures: false, dims: true, table: false };
       case 'premises':
         return { regionsFill: false, allRegions: true, regionTypes: null,
-                 furniture: false, fixtures: false, dims: true, table: 'all' };
+                 furniture: false, fittings: false, fixtures: false, dims: true, table: 'all' };
       case 'kyakushitsu':
         return { regionsFill: true, allRegions: false, regionTypes: ['kyakushitsu'],
-                 furniture: false, fixtures: false, dims: true, table: 'kyakushitsu' };
+                 furniture: false, fittings: false, fixtures: false, dims: true, table: 'kyakushitsu' };
       case 'lighting':
         return { regionsFill: true, allRegions: true, regionTypes: null,
-                 furniture: false, fixtures: true, dims: false, table: false };
+                 furniture: false, fittings: false, fixtures: true, dims: false, table: false };
       default:
         return { regionsFill: true, allRegions: true, regionTypes: null,
-                 furniture: true, fixtures: true, dims: true, table: false };
+                 furniture: true, fittings: true, fixtures: true, dims: true, table: false };
     }
   }
 
@@ -238,6 +305,11 @@
     }
     if (vis.dims) {
       for (const r of regions) drawDimension(ctx, r);
+    }
+    if (vis.fittings && project.fittings) {
+      for (const g of project.fittings) {
+        drawFitting(ctx, g, { selected: state.selectedId === g.id });
+      }
     }
     if (vis.furniture) {
       for (const f of project.furniture) {

@@ -27,6 +27,15 @@
     tsuitate: { label: 'つい立て',   w: 900,  h: 40,  height: 1500 },
   };
 
+  /* 建具・設備カタログ(壁に沿って配置する線状の部品。mm) */
+  const FITTING_CATALOG = {
+    entrance: { label: '出入口', w: 1200, h: 120 },
+    door:     { label: '扉',     w: 800,  h: 120 },
+    window:   { label: '窓',     w: 1650, h: 120 },
+    wall:     { label: '壁',     w: 2000, h: 120 },
+    pillar:   { label: '柱',     w: 300,  h: 300 },
+  };
+
   /* 照明・音響設備カタログ(点で配置) */
   const FIXTURE_CATALOG = {
     downlight:   { label: 'ダウンライト', symbol: 'DL' },
@@ -65,6 +74,7 @@
       },
       regions: [],
       furniture: [],
+      fittings: [],
       fixtures: [],
       _seq: 1,
     };
@@ -121,6 +131,22 @@
     return item;
   }
 
+  function addFitting(project, kind) {
+    const c = FITTING_CATALOG[kind];
+    const item = {
+      id: nextId(project, 'g'),
+      kind,
+      label: c.label,
+      x: 1500,
+      y: 1500,
+      w: c.w,
+      h: c.h,
+      rotation: 0,
+    };
+    project.fittings.push(item);
+    return item;
+  }
+
   function addFixture(project, kind) {
     const c = FIXTURE_CATALOG[kind];
     const item = {
@@ -137,7 +163,7 @@
   }
 
   function removeById(project, id) {
-    for (const key of ['regions', 'furniture', 'fixtures']) {
+    for (const key of ['regions', 'furniture', 'fittings', 'fixtures']) {
       const i = project[key].findIndex((e) => e.id === id);
       if (i >= 0) { project[key].splice(i, 1); return true; }
     }
@@ -145,7 +171,7 @@
   }
 
   function findById(project, id) {
-    for (const key of ['regions', 'furniture', 'fixtures']) {
+    for (const key of ['regions', 'furniture', 'fittings', 'fixtures']) {
       const e = project[key].find((e) => e.id === id);
       if (e) return { element: e, kind: key };
     }
@@ -165,18 +191,20 @@
     project.meta = Object.assign(base.meta, obj.meta || {});
     project.regions = obj.regions || [];
     project.furniture = obj.furniture || [];
+    project.fittings = obj.fittings || [];
     project.fixtures = obj.fixtures || [];
     if (typeof project._seq !== 'number') {
-      project._seq = 1 + project.regions.length + project.furniture.length + project.fixtures.length;
+      project._seq = 1 + project.regions.length + project.furniture.length +
+                     project.fittings.length + project.fixtures.length;
     }
     return project;
   }
 
   global.Model = {
-    REGION_TYPES, FURNITURE_CATALOG, FIXTURE_CATALOG, PAPER_SIZES,
+    REGION_TYPES, FURNITURE_CATALOG, FITTING_CATALOG, FIXTURE_CATALOG, PAPER_SIZES,
     SIGHTLINE_LIMIT,
     todayStr, defaultProject, nextId, nextRegionNumber,
-    addRegion, addFurniture, addFixture, removeById, findById,
+    addRegion, addFurniture, addFitting, addFixture, removeById, findById,
     serialize, deserialize,
   };
 })(window);
