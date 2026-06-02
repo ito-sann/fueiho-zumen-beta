@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>深夜酒類 図面エディタ</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">深夜酒類 図面エディタ<span class="tag">届出用 平面図 / 求積図</span></div>
+    <div class="layer-tabs" id="layerTabs"></div>
+    <div class="top-actions">
+      <button id="btnSave"  class="btn">保存</button>
+      <button id="btnLoad"  class="btn">読み込み</button>
+      <button id="btnPdf"   class="btn primary">PDF出力</button>
+      <input type="file" id="fileInput" accept="application/json" hidden>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- 左:ツール -->
+    <aside class="panel left">
+      <section class="group">
+        <h3>区画を追加</h3>
+        <div class="add-row">
+          <select id="regionType"></select>
+          <button id="btnAddRegion" class="btn small">追加</button>
+        </div>
+        <div class="size-row">
+          <label>幅 <input type="number" id="regionW" value="3200" step="100"> mm</label>
+          <label>奥行 <input type="number" id="regionH" value="2000" step="100"> mm</label>
+        </div>
+      </section>
+
+      <section class="group">
+        <h3>備品を追加</h3>
+        <div class="add-row">
+          <select id="furnKind"></select>
+          <button id="btnAddFurn" class="btn small">追加</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h3>照明・音響を追加</h3>
+        <div class="add-row">
+          <select id="fixKind"></select>
+          <button id="btnAddFix" class="btn small">追加</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h3>図面情報</h3>
+        <label class="field">店舗名 <input type="text" id="metaStore"></label>
+        <label class="field">所在地 <input type="text" id="metaAddr"></label>
+        <div class="size-row">
+          <label>縮尺
+            <select id="metaScale"><option value="50">1/50</option><option value="100">1/100</option></select>
+          </label>
+          <label>用紙
+            <select id="metaPaper"><option value="A4">A4</option><option value="A3">A3</option></select>
+          </label>
+        </div>
+        <div class="size-row">
+          <label>向き
+            <select id="metaOrient"><option value="landscape">横</option><option value="portrait">縦</option></select>
+          </label>
+          <label>作成者 <input type="text" id="metaAuthor"></label>
+        </div>
+      </section>
+
+      <section class="group">
+        <button id="btnFit" class="btn block">全体表示にもどす</button>
+        <button id="btnNew" class="btn block danger">新規(クリア)</button>
+      </section>
+    </aside>
+
+    <!-- 中央:キャンバス -->
+    <section class="canvas-wrap">
+      <canvas id="canvas"></canvas>
+      <div class="hint">空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(10cm吸着・Shiftで自由)/ Deleteで削除</div>
+    </section>
+
+    <!-- 右:プロパティ・面積・注意 -->
+    <aside class="panel right">
+      <section class="group">
+        <h3>面積サマリー</h3>
+        <table class="summary" id="summaryTable"></table>
+      </section>
+
+      <section class="group">
+        <h3>選択中の要素</h3>
+        <div id="props" class="props"><p class="muted">要素を選ぶと編集できます。</p></div>
+      </section>
+
+      <section class="group">
+        <h3>求積表</h3>
+        <div id="kyusekiBox"></div>
+      </section>
+
+      <section class="group">
+        <h3 id="warnHead">見通しの注意</h3>
+        <div id="warnBox" class="warn"></div>
+      </section>
+    </aside>
+  </main>
+
+  <script src="js/model.js"></script>
+  <script src="js/geometry.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/interactions.js"></script>
+  <script src="js/print.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
