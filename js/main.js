@@ -258,7 +258,7 @@
     }
     if (kind === 'regions') {
       const area = G.regionAreaSqm(el);
-      html += `<div class="prop-row"><span>面積</span><b>${area.toFixed(4)} ㎡</b></div>`;
+      html += `<div class="prop-row"><span>面積</span><b id="propArea">${area.toFixed(4)} ㎡</b></div>`;
     }
     html += `<button class="btn small danger" id="btnDel">この要素を削除</button>`;
     box.innerHTML = html;
@@ -270,6 +270,9 @@
         if (e.target.type === 'number') v = parseFloat(v) || 0;
         el[f] = v;
         refresh();
+        // 面積表示を即時に更新(幅・奥行の変更に追従)
+        const areaEl = box.querySelector('#propArea');
+        if (areaEl) areaEl.textContent = G.regionAreaSqm(el).toFixed(4) + ' ㎡';
       });
     });
     $('btnDel').onclick = () => {
