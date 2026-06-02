@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.0.9">
+  <link rel="stylesheet" href="css/style.css?v=1.1.0">
 </head>
 <body>
   <header class="topbar">
@@ -94,6 +94,16 @@
       </section>
 
       <section class="group">
+        <h3>移動の単位(スナップ)</h3>
+        <select id="snapSelect">
+          <option value="10" selected>1cm</option>
+          <option value="50">5cm</option>
+          <option value="100">10cm</option>
+          <option value="1">自由(1mm)</option>
+        </select>
+      </section>
+
+      <section class="group">
         <button id="btnFit" class="btn block">全体表示にもどす</button>
         <button id="btnNew" class="btn block danger">新規(クリア)</button>
       </section>
@@ -102,7 +112,7 @@
     <!-- 中央:キャンバス -->
     <section class="canvas-wrap">
       <canvas id="canvas"></canvas>
-      <div class="hint">空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(10cm吸着・Shiftで自由)/ Deleteで削除</div>
+      <div class="hint">空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(既定1cm吸着・Shiftで自由)/ 矢印キーで微調整(Shiftで10倍)/ Deleteで削除</div>
     </section>
 
     <!-- 右:プロパティ・面積・注意 -->
@@ -129,11 +139,11 @@
     </aside>
   </main>
 
-  <script src="js/model.js?v=1.0.9"></script>
-  <script src="js/geometry.js?v=1.0.9"></script>
-  <script src="js/render.js?v=1.0.9"></script>
-  <script src="js/interactions.js?v=1.0.9"></script>
-  <script src="js/print.js?v=1.0.9"></script>
-  <script src="js/main.js?v=1.0.9"></script>
+  <script src="js/model.js?v=1.1.0"></script>
+  <script src="js/geometry.js?v=1.1.0"></script>
+  <script src="js/render.js?v=1.1.0"></script>
+  <script src="js/interactions.js?v=1.1.0"></script>
+  <script src="js/print.js?v=1.1.0"></script>
+  <script src="js/main.js?v=1.1.0"></script>
 </body>
 </html>

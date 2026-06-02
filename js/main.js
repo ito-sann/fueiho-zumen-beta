@@ -133,6 +133,7 @@
       R.fitToView(project, canvasCss());
       refresh(); showProps(null);
     };
+    $('snapSelect').onchange = (e) => I.setSnap(parseInt(e.target.value, 10));
     $('btnSave').onclick = saveFile;
     $('btnLoad').onclick = () => $('fileInput').click();
     $('fileInput').onchange = loadFile;

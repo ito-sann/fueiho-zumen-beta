@@ -1,12 +1,14 @@
 /* =========================================================================
  * interactions.js — マウス操作(選択・移動・パン・ズーム)。
- * 移動時は 100mm(10cm)グリッドに吸着(スナップ)する。
+ * 移動時は指定の単位(既定 10mm=1cm)に吸着(スナップ)する。
  * ========================================================================= */
 (function (global) {
   'use strict';
 
-  const SNAP = 100; // mm
-  function snap(v) { return Math.round(v / SNAP) * SNAP; }
+  let snapMm = 10; // 吸着の単位(mm)。既定は 1cm。
+  function setSnap(mm) { snapMm = Math.max(1, mm | 0); }
+  function getSnap() { return snapMm; }
+  function snap(v) { return Math.round(v / snapMm) * snapMm; }
 
   /* 回転した長方形の内側判定。要素の中心まわりに -rotation だけ戻して矩形判定する。 */
   function inRotatedRect(wx, wy, el) {
@@ -107,7 +109,8 @@
       onChange();
     }, { passive: false });
 
-    // Delete キーで選択要素を削除
+    // Delete キーで削除 / 矢印キーで微調整(1単位ぶん、Shiftで10倍)
+    const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     window.addEventListener('keydown', (e) => {
       const tag = (e.target.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
@@ -116,9 +119,21 @@
         state.selectedId = null;
         onSelect(null);
         onChange();
+        return;
+      }
+      if (ARROWS[e.key] && state.selectedId) {
+        const found = global.Model.findById(project, state.selectedId);
+        if (!found) return;
+        e.preventDefault();
+        const step = snapMm * (e.shiftKey ? 10 : 1); // 既定 1cm、Shiftで10cm
+        const [dx, dy] = ARROWS[e.key];
+        found.element.x += dx * step;
+        found.element.y += dy * step;
+        onChange();
+        onSelect(found.element);
       }
     });
   }
 
-  global.Interactions = { attach, snap, hitTest };
+  global.Interactions = { attach, snap, setSnap, getSnap, hitTest };
 })(window);
