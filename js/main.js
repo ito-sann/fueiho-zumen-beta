@@ -92,12 +92,18 @@
   function bindToolbar() {
     $('btnAddRegion').onclick = () => {
       const type = $('regionType').value;
+      const shape = $('regionShape').value;
       const w = clampSize($('regionW').value);
       const h = clampSize($('regionH').value);
-      const r = M.addRegion(project, type, w, h);
+      const w2 = shape === 'trapezoid' ? clampSize($('regionW2').value) : undefined;
+      const r = M.addRegion(project, type, w, h, shape, w2);
       placeAtViewCenter(r);
       state.selectedId = r.id;
       refresh(); showProps(r);
+    };
+    // 台形のときだけ「上底」入力欄を表示
+    $('regionShape').onchange = (e) => {
+      $('regionW2Row').style.display = e.target.value === 'trapezoid' ? '' : 'none';
     };
     $('btnAddFurn').onclick = () => {
       const f = M.addFurniture(project, $('furnKind').value);
@@ -210,14 +216,14 @@
     if (layer === 'kyakushitsu') { types = ['kyakushitsu']; title = '客室求積表'; }
     const t = G.buildTable(project, types);
     let rows = t.rows.map((r) =>
-      `<tr><td>${esc(r.label)}</td><td>${r.expr}</td><td>${r.area.toFixed(4)}</td></tr>`).join('');
-    if (!rows) rows = '<tr><td colspan="3" class="muted">区画がありません</td></tr>';
+      `<tr><td>${r.code}</td><td>${esc(r.label)}</td><td>${r.expr}</td><td>${r.area.toFixed(4)}</td></tr>`).join('');
+    if (!rows) rows = '<tr><td colspan="4" class="muted">区画がありません</td></tr>';
     $('kyusekiBox').innerHTML = `
       <div class="kyuseki-title">${title}</div>
       <table class="kyuseki">
-        <thead><tr><th>区画</th><th>計算式</th><th>面積(㎡)</th></tr></thead>
+        <thead><tr><th>符号</th><th>区画</th><th>計算式</th><th>面積(㎡)</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td colspan="2">合計(総面積)</td><td>${t.total.toFixed(2)} ㎡</td></tr></tfoot>
+        <tfoot><tr><td colspan="3">合計(総面積)</td><td>${t.total.toFixed(2)} ㎡</td></tr></tfoot>
       </table>`;
   }
 
@@ -244,7 +250,7 @@
     html += propText('ラベル', 'label', el.label);
     html += propNum('X位置(mm)', 'x', el.x);
     html += propNum('Y位置(mm)', 'y', el.y);
-    if (kind === 'regions' || kind === 'furniture' || kind === 'fittings') {
+    if (kind === 'furniture' || kind === 'fittings') {
       html += propNum(kind === 'fittings' ? '長さ(mm)' : '幅(mm)', 'w', el.w);
       html += propNum(kind === 'fittings' ? '厚み(mm)' : '奥行(mm)', 'h', el.h);
       html += propNum('角度(度)', 'rotation', el.rotation || 0);
@@ -257,6 +263,16 @@
       html += propText('型番メモ', 'model', el.model || '');
     }
     if (kind === 'regions') {
+      const shape = el.shape || 'rect';
+      const wLabel = shape === 'rect' ? '幅(mm)' : shape === 'triangle' ? '底辺(mm)' : '下底(mm)';
+      const hLabel = shape === 'rect' ? '奥行(mm)' : '高さ(mm)';
+      html += `<div class="prop-row"><span>形</span><b>${shapeLabel(shape)}</b></div>`;
+      html += propNum(wLabel, 'w', el.w);
+      if (shape === 'trapezoid') {
+        html += propNum('上底(mm)', 'w2', el.w2 != null ? el.w2 : el.w);
+      }
+      html += propNum(hLabel, 'h', el.h);
+      html += propNum('角度(度)', 'rotation', el.rotation || 0);
       const area = G.regionAreaSqm(el);
       html += `<div class="prop-row"><span>面積</span><b id="propArea">${area.toFixed(4)} ㎡</b></div>`;
     }
@@ -280,6 +296,10 @@
       state.selectedId = null;
       refresh(); showProps(null);
     };
+  }
+
+  function shapeLabel(shape) {
+    return { rect: '長方形', triangle: '三角形', trapezoid: '台形' }[shape] || '長方形';
   }
 
   function kindLabel(el, kind) {

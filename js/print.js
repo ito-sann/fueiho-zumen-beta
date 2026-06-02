@@ -7,14 +7,14 @@
 
   function tableHtml(title, table) {
     let rows = table.rows.map((r) =>
-      `<tr><td>${escapeHtml(r.label)}</td><td>${r.expr}</td><td class="num">${r.area.toFixed(4)} ㎡</td></tr>`
+      `<tr><td>${r.code}</td><td>${escapeHtml(r.label)}</td><td>${r.expr}</td><td class="num">${r.area.toFixed(4)} ㎡</td></tr>`
     ).join('');
     return `
       <table class="kyuseki">
         <caption>${escapeHtml(title)}</caption>
-        <thead><tr><th>区画</th><th>計算式</th><th>面積(㎡)</th></tr></thead>
+        <thead><tr><th>符号</th><th>区画</th><th>計算式</th><th>面積(㎡)</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td colspan="2">合計(総面積)</td><td class="num">${table.total.toFixed(2)} ㎡</td></tr></tfoot>
+        <tfoot><tr><td colspan="3">合計(総面積)</td><td class="num">${table.total.toFixed(2)} ㎡</td></tr></tfoot>
       </table>`;
   }
 

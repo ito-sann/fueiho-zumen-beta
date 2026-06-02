@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.0.8">
+  <link rel="stylesheet" href="css/style.css?v=1.0.9">
 </head>
 <body>
   <header class="topbar">
@@ -32,8 +32,20 @@
           <button id="btnAddRegion" class="btn small">追加</button>
         </div>
         <div class="size-row">
-          <label>幅 <input type="number" id="regionW" value="3200" step="100"> mm</label>
-          <label>奥行 <input type="number" id="regionH" value="2000" step="100"> mm</label>
+          <label>形
+            <select id="regionShape">
+              <option value="rect">長方形</option>
+              <option value="triangle">三角形</option>
+              <option value="trapezoid">台形</option>
+            </select>
+          </label>
+        </div>
+        <div class="size-row">
+          <label>幅/底辺 <input type="number" id="regionW" value="3200" step="100"> mm</label>
+          <label>奥行/高さ <input type="number" id="regionH" value="2000" step="100"> mm</label>
+        </div>
+        <div class="size-row" id="regionW2Row" style="display:none">
+          <label>上底(台形) <input type="number" id="regionW2" value="1600" step="100"> mm</label>
         </div>
       </section>
 
@@ -117,11 +129,11 @@
     </aside>
   </main>
 
-  <script src="js/model.js?v=1.0.8"></script>
-  <script src="js/geometry.js?v=1.0.8"></script>
-  <script src="js/render.js?v=1.0.8"></script>
-  <script src="js/interactions.js?v=1.0.8"></script>
-  <script src="js/print.js?v=1.0.8"></script>
-  <script src="js/main.js?v=1.0.8"></script>
+  <script src="js/model.js?v=1.0.9"></script>
+  <script src="js/geometry.js?v=1.0.9"></script>
+  <script src="js/render.js?v=1.0.9"></script>
+  <script src="js/interactions.js?v=1.0.9"></script>
+  <script src="js/print.js?v=1.0.9"></script>
+  <script src="js/main.js?v=1.0.9"></script>
 </body>
 </html>

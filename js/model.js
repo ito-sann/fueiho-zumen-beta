@@ -95,7 +95,7 @@
     return max + 1;
   }
 
-  function addRegion(project, type, w, h) {
+  function addRegion(project, type, w, h, shape, w2) {
     const number = nextRegionNumber(project, type);
     const t = REGION_TYPES[type];
     const region = {
@@ -107,6 +107,8 @@
       y: 1000,
       w: w,
       h: h,
+      shape: shape || 'rect',     // 'rect' | 'triangle' | 'trapezoid'
+      w2: w2 != null ? w2 : Math.round(w / 2), // 台形の上底(mm)
       rotation: 0,
       color: t.color,
     };

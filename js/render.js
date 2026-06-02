@@ -80,32 +80,59 @@
     ctx.restore();
   }
 
+  /* 形ごとの頂点(中心原点・画面px)。w,h,w2 は px。 */
+  function shapePoints(shape, w, h, w2) {
+    if (shape === 'triangle') {
+      // 直角三角形(直角=左下)。底辺=下、高さ=左。
+      return [[-w / 2, h / 2], [w / 2, h / 2], [-w / 2, -h / 2]];
+    }
+    if (shape === 'trapezoid') {
+      const t = w2 / 2; // 上底の半幅
+      return [[-w / 2, h / 2], [w / 2, h / 2], [t, -h / 2], [-t, -h / 2]];
+    }
+    return [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]];
+  }
+
+  function tracePoly(ctx, pts) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+  }
+
   function drawRegion(ctx, r, opts) {
     const sc = worldToScreen(r.x + r.w / 2, r.y + r.h / 2); // 中心
     const w = r.w * view.zoom, h = r.h * view.zoom;
+    const w2 = (r.w2 != null ? r.w2 : r.w) * view.zoom;
+    const pts = shapePoints(r.shape || 'rect', w, h, w2);
     ctx.save();
     ctx.translate(sc.x, sc.y);
     ctx.rotate((r.rotation || 0) * Math.PI / 180);
-    ctx.fillStyle = opts.fill ? r.color : 'rgba(0,0,0,0)';
-    ctx.globalAlpha = opts.fill ? 0.55 : 1;
-    ctx.fillRect(-w / 2, -h / 2, w, h);
-    ctx.globalAlpha = 1;
+    tracePoly(ctx, pts);
+    if (opts.fill) {
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = r.color;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
     ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : '#333';
-    ctx.strokeRect(-w / 2, -h / 2, w, h);
-    // ラベル
+    ctx.stroke();
+    // ラベル(符号つき)
     ctx.fillStyle = '#222';
     ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(r.label, 0, 0);
+    const label = (opts.code ? opts.code + ' ' : '') + r.label;
+    ctx.fillText(label, 0, 0);
     ctx.restore();
   }
 
-  /* 寸法線(区画の上辺=幅、左辺=奥行)。区画の回転に追従する。 */
+  /* 寸法線(底辺=下、高さ=左、台形は上底=上)。区画の回転に追従する。 */
   function drawDimension(ctx, r) {
     const sc = worldToScreen(r.x + r.w / 2, r.y + r.h / 2);
     const w = r.w * view.zoom, h = r.h * view.zoom;
+    const shape = r.shape || 'rect';
     const off = 14;
     ctx.save();
     ctx.translate(sc.x, sc.y);
@@ -115,14 +142,15 @@
     ctx.lineWidth = 1;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    // 幅(上辺の外側)
-    const wy = -h / 2 - off;
-    ctx.beginPath(); ctx.moveTo(-w / 2, wy); ctx.lineTo(w / 2, wy); ctx.stroke();
-    tick(ctx, -w / 2, wy); tick(ctx, w / 2, wy);
-    ctx.fillText(global.Geometry.fmtM(r.w) + 'm', 0, wy - 2);
-    // 奥行(左辺の外側)
+    // 底辺/幅(下辺の外側)
+    const by = h / 2 + off;
+    ctx.textBaseline = 'top';
+    ctx.beginPath(); ctx.moveTo(-w / 2, by); ctx.lineTo(w / 2, by); ctx.stroke();
+    tick(ctx, -w / 2, by); tick(ctx, w / 2, by);
+    ctx.fillText(global.Geometry.fmtM(r.w) + 'm', 0, by + 2);
+    // 高さ/奥行(左辺の外側)
     const wx = -w / 2 - off;
+    ctx.textBaseline = 'bottom';
     ctx.beginPath(); ctx.moveTo(wx, -h / 2); ctx.lineTo(wx, h / 2); ctx.stroke();
     tick(ctx, wx, -h / 2); tick(ctx, wx, h / 2);
     ctx.save();
@@ -130,6 +158,15 @@
     ctx.rotate(-Math.PI / 2);
     ctx.fillText(global.Geometry.fmtM(r.h) + 'm', 0, 0);
     ctx.restore();
+    // 台形のみ:上底(上辺の外側)
+    if (shape === 'trapezoid') {
+      const w2 = (r.w2 != null ? r.w2 : r.w) * view.zoom;
+      const ty = -h / 2 - off;
+      ctx.textBaseline = 'bottom';
+      ctx.beginPath(); ctx.moveTo(-w2 / 2, ty); ctx.lineTo(w2 / 2, ty); ctx.stroke();
+      tick(ctx, -w2 / 2, ty); tick(ctx, w2 / 2, ty);
+      ctx.fillText(global.Geometry.fmtM(r.w2 != null ? r.w2 : r.w) + 'm', 0, ty - 2);
+    }
     ctx.restore();
   }
   function tick(ctx, x, y) {
@@ -301,7 +338,8 @@
       vis.allRegions || (vis.regionTypes && vis.regionTypes.indexOf(r.type) >= 0));
 
     for (const r of regions) {
-      drawRegion(ctx, r, { fill: vis.regionsFill, selected: state.selectedId === r.id });
+      const code = global.Geometry.code(project.regions.indexOf(r) + 1); // 符号①②③…
+      drawRegion(ctx, r, { fill: vis.regionsFill, selected: state.selectedId === r.id, code });
     }
     if (vis.dims) {
       for (const r of regions) drawDimension(ctx, r);

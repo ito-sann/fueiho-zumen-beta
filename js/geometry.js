@@ -22,16 +22,37 @@
     return mmToM(mm).toFixed(2);
   }
 
-  /* 1区画(長方形)の求積計算
-   *   辺(第2位) × 辺(第2位) = 部屋の面積(第4位) */
-  function regionCalc(region) {
-    const wM = mmToM(region.w);          // 例: 3.25
-    const hM = mmToM(region.h);          // 例: 4.51
-    const area4 = round4(wM * hM);       // 部屋の面積: 第4位まで(例 14.6575)
-    return { wM, hM, area4 };
+  /* 符号(①②③…)。20まで丸囲み数字、それ以降は (21) 形式。 */
+  function code(n) {
+    if (n >= 1 && n <= 20) return String.fromCharCode(0x245F + n);
+    return `(${n})`;
   }
 
-  /* 長方形区画の面積(㎡・小数第4位) */
+  /* 1区画の求積計算(形ごと)
+   *   長方形 : 幅 × 奥行
+   *   三角形 : 底辺 × 高さ ÷ 2
+   *   台形   : (上底 + 下底) × 高さ ÷ 2
+   * いずれも面積は第4位まで。 */
+  function regionCalc(region) {
+    const wM = mmToM(region.w);
+    const hM = mmToM(region.h);
+    const shape = region.shape || 'rect';
+    let area4, expr;
+    if (shape === 'triangle') {
+      area4 = round4(wM * hM / 2);
+      expr = `${wM.toFixed(2)} × ${hM.toFixed(2)} ÷ 2`;
+    } else if (shape === 'trapezoid') {
+      const w2M = mmToM(region.w2 != null ? region.w2 : region.w);
+      area4 = round4((w2M + wM) * hM / 2);
+      expr = `(${w2M.toFixed(2)} + ${wM.toFixed(2)}) × ${hM.toFixed(2)} ÷ 2`;
+    } else {
+      area4 = round4(wM * hM);
+      expr = `${wM.toFixed(2)} × ${hM.toFixed(2)}`;
+    }
+    return { wM, hM, area4, expr, shape };
+  }
+
+  /* 区画の面積(㎡・小数第4位) */
   function regionAreaSqm(region) {
     return regionCalc(region).area4;
   }
@@ -39,30 +60,30 @@
   /* 1区画 → 求積表の1行 */
   function regionRow(region) {
     const c = regionCalc(region);
-    const wStr = c.wM.toFixed(2);
-    const hStr = c.hM.toFixed(2);
     return {
       id: region.id,
       label: region.label,
       type: region.type,
-      w: wStr, h: hStr,
-      expr: `${wStr} × ${hStr}`,            // 計算式(辺×辺)
-      formula: `${wStr} × ${hStr} = ${c.area4.toFixed(4)}`,
+      w: c.wM.toFixed(2), h: c.hM.toFixed(2),
+      expr: c.expr,
+      formula: `${c.expr} = ${c.area4.toFixed(4)}`,
       area: c.area4,        // 部屋の面積(第4位)
     };
   }
 
   /* 種類でフィルタした求積表(行 + 合計)
-   * 各部屋は第4位。合計は第4位の値を足し込み、最後に第2位へ丸める(総面積)。 */
+   * 各部屋は第4位。合計は第4位の値を足し込み、最後に第2位へ丸める(総面積)。
+   * 符号は project.regions 全体での並び順(①②③…)。 */
   function buildTable(project, filterTypes) {
     const rows = [];
     let totalCalc = 0;
-    for (const r of project.regions) {
-      if (filterTypes && filterTypes.indexOf(r.type) < 0) continue;
+    project.regions.forEach((r, i) => {
+      if (filterTypes && filterTypes.indexOf(r.type) < 0) return;
       const row = regionRow(r);
+      row.code = code(i + 1);
       rows.push(row);
       totalCalc += row.area;
-    }
+    });
     return { rows, total: round2(totalCalc) };
   }
 
@@ -116,7 +137,7 @@
   }
 
   global.Geometry = {
-    mmToM, fmtM, regionAreaSqm, regionRow, buildTable,
+    mmToM, fmtM, code, regionCalc, regionAreaSqm, regionRow, buildTable,
     summary, sightlineWarnings, boundingBox,
   };
 })(window);
