@@ -5,48 +5,67 @@
 (function (global) {
   'use strict';
 
-  /* mm → m(小数2桁) */
+  /* 求積のルール:
+   *   ・寸法(辺の長さ)は m 表記・小数第2位(cm 単位)
+   *   ・各基本図形の面積の「計算過程」は小数第4位まで
+   *   ・求積表/図面に載せる最終面積は小数第2位
+   */
+  function round4(n) { return Math.round(n * 10000) / 10000; }
+  function round2(n) { return Math.round(n * 100) / 100; }
+
+  /* mm → m(小数第2位・cm 単位に丸め) */
   function mmToM(mm) {
-    return Math.round(mm / 10) / 100; // 1cm 単位で丸めて m 表記(0.01m=1cm)
+    return Math.round(mm / 10) / 100;
   }
 
   function fmtM(mm) {
     return mmToM(mm).toFixed(2);
   }
 
-  /* 長方形区画の面積(㎡)。小数2桁で丸める。 */
+  /* 1区画(長方形)の求積計算
+   *   辺(第2位) × 辺(第2位) = 計算過程(第4位) → 最終面積(第2位) */
+  function regionCalc(region) {
+    const wM = mmToM(region.w);          // 例: 3.20
+    const hM = mmToM(region.h);          // 例: 4.50
+    const areaCalc = round4(wM * hM);    // 計算過程: 第4位まで(例 14.4000)
+    const areaFinal = round2(areaCalc);  // 最終表記: 第2位(例 14.40)
+    return { wM, hM, areaCalc, areaFinal };
+  }
+
+  /* 長方形区画の最終面積(㎡・小数第2位) */
   function regionAreaSqm(region) {
-    const a = (region.w / 1000) * (region.h / 1000);
-    return Math.round(a * 100) / 100;
+    return regionCalc(region).areaFinal;
   }
 
   /* 1区画 → 求積表の1行 */
   function regionRow(region) {
-    const wM = fmtM(region.w);
-    const hM = fmtM(region.h);
-    const area = regionAreaSqm(region);
+    const c = regionCalc(region);
+    const wStr = c.wM.toFixed(2);
+    const hStr = c.hM.toFixed(2);
+    const calcStr = c.areaCalc.toFixed(4); // 計算過程(第4位)
     return {
       id: region.id,
       label: region.label,
       type: region.type,
-      formula: `${wM} × ${hM} = ${area.toFixed(2)} ㎡`,
-      w: wM, h: hM,
-      area,
+      w: wStr, h: hStr,
+      formula: `${wStr} × ${hStr} = ${calcStr}`,
+      areaCalc: c.areaCalc,   // 合計の集計に使う(第4位の値)
+      area: c.areaFinal,      // 最終表記(第2位)
     };
   }
 
-  /* 種類でフィルタした求積表(行 + 合計) */
+  /* 種類でフィルタした求積表(行 + 合計)
+   * 合計は各図形の計算過程(第4位)を足し込み、最後に第2位へ丸める。 */
   function buildTable(project, filterTypes) {
     const rows = [];
-    let total = 0;
+    let totalCalc = 0;
     for (const r of project.regions) {
       if (filterTypes && filterTypes.indexOf(r.type) < 0) continue;
       const row = regionRow(r);
       rows.push(row);
-      total += row.area;
+      totalCalc += row.areaCalc;
     }
-    total = Math.round(total * 100) / 100;
-    return { rows, total };
+    return { rows, total: round2(totalCalc) };
   }
 
   /* 主要な面積サマリー */

@@ -7,12 +7,12 @@
 
   function tableHtml(title, table) {
     let rows = table.rows.map((r) =>
-      `<tr><td>${escapeHtml(r.label)}</td><td>${r.w} × ${r.h}</td><td class="num">${r.area.toFixed(2)} ㎡</td></tr>`
+      `<tr><td>${escapeHtml(r.label)}</td><td>${r.formula}</td><td class="num">${r.area.toFixed(2)} ㎡</td></tr>`
     ).join('');
     return `
       <table class="kyuseki">
         <caption>${escapeHtml(title)}</caption>
-        <thead><tr><th>区画</th><th>計算式(m)</th><th>面積</th></tr></thead>
+        <thead><tr><th>区画</th><th>計算式(㎡・計算過程は第4位)</th><th>面積(第2位)</th></tr></thead>
         <tbody>${rows}</tbody>
         <tfoot><tr><td colspan="2">合計</td><td class="num">${table.total.toFixed(2)} ㎡</td></tr></tfoot>
       </table>`;

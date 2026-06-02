@@ -210,14 +210,14 @@
     if (layer === 'kyakushitsu') { types = ['kyakushitsu']; title = '客室求積表'; }
     const t = G.buildTable(project, types);
     let rows = t.rows.map((r) =>
-      `<tr><td>${esc(r.label)}</td><td>${r.formula}</td></tr>`).join('');
-    if (!rows) rows = '<tr><td colspan="2" class="muted">区画がありません</td></tr>';
+      `<tr><td>${esc(r.label)}</td><td>${r.formula}</td><td>${r.area.toFixed(2)}</td></tr>`).join('');
+    if (!rows) rows = '<tr><td colspan="3" class="muted">区画がありません</td></tr>';
     $('kyusekiBox').innerHTML = `
       <div class="kyuseki-title">${title}</div>
       <table class="kyuseki">
-        <thead><tr><th>区画</th><th>計算式</th></tr></thead>
+        <thead><tr><th>区画</th><th>計算式(計算過程・第4位)</th><th>面積(第2位)</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td>合計</td><td>${t.total.toFixed(2)} ㎡</td></tr></tfoot>
+        <tfoot><tr><td colspan="2">合計</td><td>${t.total.toFixed(2)} ㎡</td></tr></tfoot>
       </table>`;
   }
 
