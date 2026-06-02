@@ -237,9 +237,9 @@
     if (kind === 'regions' || kind === 'furniture') {
       html += propNum('幅(mm)', 'w', el.w);
       html += propNum('奥行(mm)', 'h', el.h);
+      html += propNum('角度(度)', 'rotation', el.rotation || 0);
     }
     if (kind === 'furniture') {
-      html += propNum('回転(度)', 'rotation', el.rotation || 0);
       html += propNum('高さ(mm)', 'height', el.height || 0);
     }
     if (kind === 'fixtures') {

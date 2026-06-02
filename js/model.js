@@ -97,6 +97,7 @@
       y: 1000,
       w: w,
       h: h,
+      rotation: 0,
       color: t.color,
     };
     project.regions.push(region);

@@ -8,6 +8,16 @@
   const SNAP = 100; // mm
   function snap(v) { return Math.round(v / SNAP) * SNAP; }
 
+  /* 回転した長方形の内側判定。要素の中心まわりに -rotation だけ戻して矩形判定する。 */
+  function inRotatedRect(wx, wy, el) {
+    const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
+    const a = -(el.rotation || 0) * Math.PI / 180;
+    const dx = wx - cx, dy = wy - cy;
+    const lx = dx * Math.cos(a) - dy * Math.sin(a);
+    const ly = dx * Math.sin(a) + dy * Math.cos(a);
+    return Math.abs(lx) <= el.w / 2 && Math.abs(ly) <= el.h / 2;
+  }
+
   function hitTest(project, wx, wy) {
     // 上に描かれるもの(設備→備品→区画)を優先
     for (let i = project.fixtures.length - 1; i >= 0; i--) {
@@ -16,12 +26,10 @@
       if (Math.hypot(wx - x.x, wy - x.y) <= r) return x;
     }
     for (let i = project.furniture.length - 1; i >= 0; i--) {
-      const f = project.furniture[i];
-      if (wx >= f.x && wx <= f.x + f.w && wy >= f.y && wy <= f.y + f.h) return f;
+      if (inRotatedRect(wx, wy, project.furniture[i])) return project.furniture[i];
     }
     for (let i = project.regions.length - 1; i >= 0; i--) {
-      const r = project.regions[i];
-      if (wx >= r.x && wx <= r.x + r.w && wy >= r.y && wy <= r.y + r.h) return r;
+      if (inRotatedRect(wx, wy, project.regions[i])) return project.regions[i];
     }
     return null;
   }

@@ -81,32 +81,35 @@
   }
 
   function drawRegion(ctx, r, opts) {
-    const p = worldToScreen(r.x, r.y);
+    const sc = worldToScreen(r.x + r.w / 2, r.y + r.h / 2); // 中心
     const w = r.w * view.zoom, h = r.h * view.zoom;
     ctx.save();
+    ctx.translate(sc.x, sc.y);
+    ctx.rotate((r.rotation || 0) * Math.PI / 180);
     ctx.fillStyle = opts.fill ? r.color : 'rgba(0,0,0,0)';
     ctx.globalAlpha = opts.fill ? 0.55 : 1;
-    ctx.fillRect(p.x, p.y, w, h);
+    ctx.fillRect(-w / 2, -h / 2, w, h);
     ctx.globalAlpha = 1;
     ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : '#333';
-    ctx.strokeRect(p.x, p.y, w, h);
+    ctx.strokeRect(-w / 2, -h / 2, w, h);
     // ラベル
     ctx.fillStyle = '#222';
     ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(r.label, p.x + w / 2, p.y + h / 2);
+    ctx.fillText(r.label, 0, 0);
     ctx.restore();
   }
 
-  /* 寸法線(区画の上辺=幅、左辺=奥行) */
+  /* 寸法線(区画の上辺=幅、左辺=奥行)。区画の回転に追従する。 */
   function drawDimension(ctx, r) {
-    const tl = worldToScreen(r.x, r.y);
-    const tr = worldToScreen(r.x + r.w, r.y);
-    const bl = worldToScreen(r.x, r.y + r.h);
+    const sc = worldToScreen(r.x + r.w / 2, r.y + r.h / 2);
+    const w = r.w * view.zoom, h = r.h * view.zoom;
     const off = 14;
     ctx.save();
+    ctx.translate(sc.x, sc.y);
+    ctx.rotate((r.rotation || 0) * Math.PI / 180);
     ctx.strokeStyle = '#1565c0';
     ctx.fillStyle = '#1565c0';
     ctx.lineWidth = 1;
@@ -114,16 +117,16 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     // 幅(上辺の外側)
-    const wy = tl.y - off;
-    ctx.beginPath(); ctx.moveTo(tl.x, wy); ctx.lineTo(tr.x, wy); ctx.stroke();
-    tick(ctx, tl.x, wy); tick(ctx, tr.x, wy);
-    ctx.fillText(global.Geometry.fmtM(r.w) + 'm', (tl.x + tr.x) / 2, wy - 2);
+    const wy = -h / 2 - off;
+    ctx.beginPath(); ctx.moveTo(-w / 2, wy); ctx.lineTo(w / 2, wy); ctx.stroke();
+    tick(ctx, -w / 2, wy); tick(ctx, w / 2, wy);
+    ctx.fillText(global.Geometry.fmtM(r.w) + 'm', 0, wy - 2);
     // 奥行(左辺の外側)
-    const wx = tl.x - off;
-    ctx.beginPath(); ctx.moveTo(wx, tl.y); ctx.lineTo(wx, bl.y); ctx.stroke();
-    tick(ctx, wx, tl.y); tick(ctx, wx, bl.y);
+    const wx = -w / 2 - off;
+    ctx.beginPath(); ctx.moveTo(wx, -h / 2); ctx.lineTo(wx, h / 2); ctx.stroke();
+    tick(ctx, wx, -h / 2); tick(ctx, wx, h / 2);
     ctx.save();
-    ctx.translate(wx - 2, (tl.y + bl.y) / 2);
+    ctx.translate(wx - 2, 0);
     ctx.rotate(-Math.PI / 2);
     ctx.fillText(global.Geometry.fmtM(r.h) + 'm', 0, 0);
     ctx.restore();
