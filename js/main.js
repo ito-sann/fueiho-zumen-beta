@@ -131,13 +131,13 @@
 
   function placeAtViewCenter(el) {
     const c = canvasCss();
-    const center = R.screenToWorld(c._cssW / 2, c._cssH / 2);
+    const center = R.screenToWorld(c.width / 2, c.height / 2);
     el.x = I.snap(center.x - el.w / 2);
     el.y = I.snap(center.y - el.h / 2);
   }
   function placeFixtureAtViewCenter(el) {
     const c = canvasCss();
-    const center = R.screenToWorld(c._cssW / 2, c._cssH / 2);
+    const center = R.screenToWorld(c.width / 2, c.height / 2);
     el.x = I.snap(center.x);
     el.y = I.snap(center.y);
   }
