@@ -129,17 +129,26 @@
     return Math.round(n / 100) * 100;
   }
 
+  // 追加するたびに少しずつ位置をずらし、要素どうしが完全に重ならないようにする
+  let cascadeStep = 0;
+  function cascade() {
+    const d = (cascadeStep % 8) * 300; // 0〜2100mm を斜めに展開
+    cascadeStep++;
+    return d;
+  }
   function placeAtViewCenter(el) {
     const c = canvasCss();
     const center = R.screenToWorld(c.width / 2, c.height / 2);
-    el.x = I.snap(center.x - el.w / 2);
-    el.y = I.snap(center.y - el.h / 2);
+    const d = cascade();
+    el.x = I.snap(center.x - el.w / 2 + d);
+    el.y = I.snap(center.y - el.h / 2 + d);
   }
   function placeFixtureAtViewCenter(el) {
     const c = canvasCss();
     const center = R.screenToWorld(c.width / 2, c.height / 2);
-    el.x = I.snap(center.x);
-    el.y = I.snap(center.y);
+    const d = cascade();
+    el.x = I.snap(center.x + d);
+    el.y = I.snap(center.y + d);
   }
 
   /* render は canvas.width(px)を見るので CSS px に差し替えた擬似オブジェクトを渡す */
