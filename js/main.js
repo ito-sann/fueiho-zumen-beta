@@ -470,6 +470,11 @@
       refresh(); showProps(f);
     };
     $('btnAddFitting').onclick = () => {
+      // 建具・設備は平面図にだけ描かれるので、他の図面からの追加は平面図へ切り替える
+      if (!R.visibility(R.getLayer()).fittings) {
+        R.setLayer('plan');
+        buildLayerTabs();
+      }
       const g = M.addFitting(project, $('fittingKind').value);
       placeAtViewCenter(g);
       state.selectedId = g.id;
@@ -653,9 +658,19 @@
   }
   function refresh() {
     draw();
+    applyPanelVisibility();
     renderSummary();
     renderKyuseki();
     renderWarnings();
+  }
+
+  /* サイドバーの各欄を、いま開いている図面に関係あるものだけ表示する。
+   * 表示する図面は index.html 側の data-layers 属性で指定する(無印は常時表示)。 */
+  function applyPanelVisibility() {
+    const layer = R.getLayer();
+    document.querySelectorAll('section[data-layers]').forEach((el) => {
+      el.style.display = el.dataset.layers.split(' ').indexOf(layer) >= 0 ? '' : 'none';
+    });
   }
 
   function renderSummary() {
@@ -777,6 +792,9 @@
 
   function renderKyuseki() {
     const layer = R.getLayer();
+    // 見出しもページに合わせる(照明音響図=設備一覧表 / 備品姿図=備品一覧表)
+    $('kyusekiHead').textContent =
+      layer === 'lighting' ? '設備一覧表' : (layer === 'furnviews' ? '備品一覧表' : '求積表');
     let html;
     if (layer === 'kyakushitsu') {
       // 客室・調理場求積図: 客室と調理場の求積表を別々に出す

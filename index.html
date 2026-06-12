@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.6.0">
+  <link rel="stylesheet" href="css/style.css?v=1.6.1">
 </head>
 <body>
   <header class="topbar">
@@ -45,7 +45,7 @@
         <p class="muted">案件ごとにブラウザ内へ自動保存されます。案件名は店舗名から自動でつきます。パソコンの買い替えに備えて、ときどき「全案件をバックアップ」でファイルに書き出してください。</p>
       </section>
 
-      <section class="group">
+      <section class="group" data-layers="plan premises kyakushitsu">
         <h3>区画を追加</h3>
         <div class="add-row">
           <select id="regionType"></select>
@@ -71,7 +71,7 @@
         <p class="muted">L字や斜め壁など自由な形は、キャンバス上で角をクリックして囲います(面積は座標法で自動計算)。</p>
       </section>
 
-      <section class="group">
+      <section class="group" data-layers="plan premises">
         <h3>営業所外周(壁芯)</h3>
         <button id="btnDrawPremise" class="btn block">外周を多角形で描く</button>
         <button id="btnPremAuto" class="btn block">区画に合わせて自動作成</button>
@@ -94,7 +94,7 @@
         <p class="muted">営業所求積図を壁芯で求める警察署向け。「内側の寸法」で描くと、壁厚の半分だけ外側に壁芯線を自動で引きます。方式は署のローカルルールに合わせて選べます。</p>
       </section>
 
-      <section class="group">
+      <section class="group" data-layers="plan">
         <h3>下絵(間取り図トレース)</h3>
         <input type="file" id="underlayFile" accept="image/*" hidden>
         <button id="btnUnderlay" class="btn block">画像を読み込む</button>
@@ -108,7 +108,7 @@
         <p class="muted">間取り図や手描きスケッチの画像を背景に薄く表示し、その上をなぞって作図できます。「下絵の横幅」を実際の寸法(mm)に合わせると縮尺が合います。下絵はPDFには印刷されません。</p>
       </section>
 
-      <section class="group">
+      <section class="group" data-layers="plan furnviews">
         <h3>備品を追加</h3>
         <div class="add-row">
           <select id="furnKind"></select>
@@ -116,7 +116,7 @@
         </div>
       </section>
 
-      <section class="group">
+      <section class="group" data-layers="plan premises kyakushitsu">
         <h3>建具・設備を追加</h3>
         <div class="add-row">
           <select id="fittingKind"></select>
@@ -126,7 +126,7 @@
         <p class="muted">チェックすると、柱が立っている区画(客室・調理場など)の求積表に「△0.09㎡」のような控除行が入り、合計から差し引かれます。扱いは警察署により異なるため切り替え式です。</p>
       </section>
 
-      <section class="group">
+      <section class="group" data-layers="lighting">
         <h3>照明・音響を追加</h3>
         <div class="add-row">
           <select id="fixKind"></select>
@@ -208,7 +208,7 @@
 
     <!-- 右:プロパティ・面積・注意 -->
     <aside class="panel right">
-      <section class="group">
+      <section class="group" data-layers="plan premises kyakushitsu">
         <h3>面積サマリー</h3>
         <table class="summary" id="summaryTable"></table>
       </section>
@@ -219,7 +219,7 @@
       </section>
 
       <section class="group">
-        <h3>求積表</h3>
+        <h3 id="kyusekiHead">求積表</h3>
         <div id="kyusekiBox"></div>
       </section>
 
@@ -244,12 +244,12 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.6.0"></script>
-  <script src="js/geometry.js?v=1.6.0"></script>
-  <script src="js/render.js?v=1.6.0"></script>
-  <script src="js/interactions.js?v=1.6.0"></script>
-  <script src="js/print.js?v=1.6.0"></script>
-  <script src="js/forms.js?v=1.6.0"></script>
-  <script src="js/main.js?v=1.6.0"></script>
+  <script src="js/model.js?v=1.6.1"></script>
+  <script src="js/geometry.js?v=1.6.1"></script>
+  <script src="js/render.js?v=1.6.1"></script>
+  <script src="js/interactions.js?v=1.6.1"></script>
+  <script src="js/print.js?v=1.6.1"></script>
+  <script src="js/forms.js?v=1.6.1"></script>
+  <script src="js/main.js?v=1.6.1"></script>
 </body>
 </html>
