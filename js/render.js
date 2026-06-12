@@ -128,18 +128,18 @@
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.closePath();
     if (opts.fill) {
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = opts.muted ? 0.15 : 0.55; // 強調対象外は薄く塗る
       ctx.fillStyle = r.color;
       ctx.fill();
       ctx.globalAlpha = 1;
     }
     ctx.lineWidth = opts.selected ? 3 : 2;
-    ctx.strokeStyle = opts.selected ? '#d32f2f' : '#333';
+    ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : '#333');
     ctx.stroke();
     // ラベルは重心に置く(実寸320mm相当の固定サイズ)
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-    ctx.fillStyle = '#222';
+    ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
     ctx.font = `${wpx(320)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -227,16 +227,16 @@
     ctx.rotate((r.rotation || 0) * Math.PI / 180);
     tracePoly(ctx, pts);
     if (opts.fill) {
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = opts.muted ? 0.15 : 0.55; // 強調対象外は薄く塗る
       ctx.fillStyle = r.color;
       ctx.fill();
       ctx.globalAlpha = 1;
     }
     ctx.lineWidth = opts.selected ? 3 : 2;
-    ctx.strokeStyle = opts.selected ? '#d32f2f' : '#333';
+    ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : '#333');
     ctx.stroke();
     // ラベル(符号つき)。文字は実寸320mm相当(図面に対して固定サイズ)
-    ctx.fillStyle = '#222';
+    ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
     ctx.font = `${wpx(320)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -600,7 +600,9 @@
         return { regionsFill: false, allRegions: true, regionTypes: null,
                  furniture: false, fittings: false, fixtures: false, dims: true, table: 'all' };
       case 'kyakushitsu':
-        return { regionsFill: true, allRegions: false, regionTypes: ['kyakushitsu', 'chubo'],
+        // 全区画を表示して間取りがわかるようにし、客室・調理場だけ強調(色+寸法)
+        return { regionsFill: true, allRegions: true, regionTypes: null,
+                 highlightTypes: ['kyakushitsu', 'chubo'],
                  furniture: false, fittings: false, fixtures: false, dims: true, table: 'kyakuchubo' };
       case 'lighting':
         return { regionsFill: true, allRegions: true, regionTypes: null,
@@ -622,12 +624,21 @@
     const regions = project.regions.filter((r) =>
       vis.allRegions || (vis.regionTypes && vis.regionTypes.indexOf(r.type) >= 0));
 
+    // highlightTypes がある図面では、対象の区画だけ強調し、他は薄く描いて間取りを示す
+    const isMain = (r) => !vis.highlightTypes || vis.highlightTypes.indexOf(r.type) >= 0;
+
     for (const r of regions) {
       const code = global.Geometry.code(project.regions.indexOf(r) + 1); // 符号①②③…
-      drawRegion(ctx, r, { fill: vis.regionsFill, selected: state.selectedId === r.id, code });
+      drawRegion(ctx, r, {
+        fill: vis.regionsFill,
+        muted: !isMain(r),
+        selected: state.selectedId === r.id,
+        code,
+      });
     }
     if (vis.dims) {
-      for (const r of regions) drawDimension(ctx, r);
+      // 寸法は強調対象(求積する区画)にだけ付けて、図面が混み合わないようにする
+      for (const r of regions) { if (isMain(r)) drawDimension(ctx, r); }
     }
     if (vis.fittings && project.fittings) {
       for (const g of project.fittings) {
