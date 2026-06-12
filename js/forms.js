@@ -93,14 +93,15 @@
 <section class="page">
   <h1>深夜における酒類提供飲食店営業営業開始届出書</h1>
 
-  <p class="addressee">${fill('', '20mm')}公安委員会 殿</p>
   <p class="date-line">届出年月日 ${fill(todayWareki(), '40mm')}</p>
+  <p class="addressee">${fill('', '20mm')}公安委員会 殿</p>
 
   <div class="todokede-sha">
     <p class="todokede-title">届出者</p>
-    <p>住　所 ${fill('', '90mm')}</p>
-    <p>氏　名（法人にあっては名称及び代表者の氏名） ${fill('', '60mm')}</p>
-    <p>電話番号 ${fill('', '50mm')}</p>
+    <div class="row"><span class="lbl">住　　所</span>${fill('', '70mm')}</div>
+    <div class="row"><span class="lbl">氏　　名</span>${fill('', '70mm')}</div>
+    <div class="note">（法人にあっては名称及び代表者の氏名）</div>
+    <div class="row"><span class="lbl">電話番号</span>${fill('', '50mm')}</div>
   </div>
 
   <p class="honbun">　風俗営業等の規制及び業務の適正化等に関する法律第33条第1項の規定により、深夜において酒類提供飲食店営業を営みたいので、次のとおり届出をします。</p>
@@ -236,54 +237,98 @@
   * { box-sizing: border-box; }
   body {
     font-family: "Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", serif;
-    margin: 0; color: #000; font-size: 10.5pt; line-height: 1.7;
+    margin: 0; color: #1a1a1a; font-size: 10.5pt; line-height: 1.9;
+    background: #e9ebef; /* 画面では紙が浮かんで見える背景 */
   }
-  /* 各様式 = 1ページ。改ページで区切る */
-  .page { page-break-after: always; break-after: page; padding: 4mm 0; }
-  .page:last-of-type { page-break-after: auto; break-after: auto; }
-  h1 { text-align: center; font-size: 14pt; font-weight: bold; margin: 0 0 8mm; letter-spacing: 2px; }
-  .addressee { font-size: 11pt; margin: 0 0 2mm; }
-  .date-line { text-align: right; margin: 0 0 2mm; }
-  .todokede-sha { margin: 0 0 4mm 50%; }
-  .todokede-sha p { margin: 1mm 0; }
-  .todokede-title { font-weight: bold; }
-  .honbun { margin: 0 0 5mm; text-indent: 0; }
-  .small { font-size: 8pt; color: #333; }
-  /* 黒罫線の様式表 */
+  /* 各様式 = 白い紙1枚として表示。印刷では1ページずつ改ページ */
+  .page {
+    background: #fff; width: 210mm; margin: 8mm auto;
+    padding: 16mm 18mm; box-shadow: 0 2px 14px rgba(0,0,0,.18);
+    page-break-after: always; break-after: page;
+  }
+  h1 {
+    text-align: center; font-size: 15pt; font-weight: bold;
+    letter-spacing: 3px; margin: 2mm 0 9mm;
+  }
+  .date-line { text-align: right; margin: 0 0 3mm; }
+  .addressee { font-size: 11pt; margin: 0 0 6mm; }
+  /* 届出者欄: 右半分にそろえて配置 */
+  .todokede-sha { margin: 0 0 6mm auto; width: 100mm; }
+  .todokede-title { font-weight: bold; margin: 0 0 1mm; }
+  .todokede-sha .row { margin: 1.5mm 0; }
+  .todokede-sha .lbl { display: inline-block; width: 22mm; }
+  .todokede-sha .note { font-size: 8pt; color: #555; margin-left: 22mm; }
+  .honbun { margin: 0 0 6mm; }
+  .small { font-size: 8pt; color: #555; }
+  /* 黒罫線の様式表。見出し列はうすい灰色で読みやすく */
   .form-table { width: 100%; border-collapse: collapse; }
-  .form-table th, .form-table td { border: 1px solid #000; padding: 2mm 3mm; vertical-align: top; }
-  .form-table th { width: 32%; font-weight: normal; text-align: left; background: #fff; }
+  .form-table th, .form-table td {
+    border: 1px solid #333; padding: 2.5mm 3.5mm; vertical-align: middle;
+  }
+  .form-table th {
+    width: 30%; font-weight: normal; text-align: left;
+    background: #f4f4f2; line-height: 1.6;
+  }
   .menu-cell { padding: 0; }
   .menu-table { width: 100%; border-collapse: collapse; }
-  .menu-table th, .menu-table td { border: 1px solid #000; padding: 1.5mm 3mm; }
-  .menu-table th { text-align: center; font-weight: normal; }
+  .menu-table th, .menu-table td { border: 1px solid #333; padding: 2mm 3.5mm; }
+  .menu-table th { text-align: center; font-weight: normal; background: #f4f4f2; }
   .menu-table tr > *:first-child { border-left: none; }
   .menu-table tr > *:last-child { border-right: none; }
   .menu-table thead th { border-top: none; }
   .menu-table tbody tr:last-child td { border-bottom: none; }
-  /* 編集可能フィールド: 画面では薄い背景 + 下線、印刷では下線のみ残す */
+  /* 編集可能フィールド: 画面ではうすい水色 + 下線、印刷では下線のみ残す */
   .fill {
-    display: inline-block; min-height: 1.4em;
-    border-bottom: 1px solid #000; background: #fdf6dc;
-    padding: 0 1mm; vertical-align: bottom;
+    display: inline-block; min-height: 1.5em;
+    border-bottom: 1px solid #333; background: #eaf3fe;
+    border-radius: 2px 2px 0 0;
+    padding: 0 2mm; vertical-align: bottom;
   }
-  .fill:focus { outline: 1px dashed #888; background: #fff3c0; }
-  /* 画面上部の操作ボタンと注意書き(印刷時は非表示) */
-  .noprint { text-align: center; padding: 8px; font-family: -apple-system, "Hiragino Sans", sans-serif; }
-  .noprint button { font-size: 13px; padding: 6px 16px; cursor: pointer; }
-  .notice {
-    margin: 6px auto 10px; max-width: 180mm; padding: 6px 10px;
-    border: 1px solid #c00; color: #c00; font-size: 12px; text-align: left;
+  .fill:focus { outline: none; background: #d8e9fd; }
+  .fill:hover { background: #ddecfd; }
+  /* 画面上部の操作バー(印刷時は非表示) */
+  .toolbar {
+    position: sticky; top: 0; z-index: 10;
+    background: #fff; border-bottom: 1px solid #d6d9de;
+    font-family: -apple-system, "Hiragino Sans", sans-serif;
+    padding: 10px 16px; box-shadow: 0 1px 6px rgba(0,0,0,.08);
+  }
+  .toolbar .bar {
+    display: flex; align-items: center; justify-content: space-between;
+    max-width: 210mm; margin: 0 auto;
+  }
+  .toolbar .bar strong { font-size: 14px; color: #1f2937; }
+  .toolbar button {
+    font-size: 13px; padding: 7px 16px; cursor: pointer; margin-left: 8px;
+    border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #1f2937;
+  }
+  .toolbar button:hover { background: #f1f5f9; }
+  .toolbar button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .toolbar button.primary:hover { background: #1d4ed8; }
+  .toolbar .notice {
+    max-width: 210mm; margin: 8px auto 0; padding: 7px 12px;
+    background: #fff8e1; border-left: 4px solid #f59e0b; border-radius: 4px;
+    color: #7c4a03; font-size: 12px; line-height: 1.6;
   }
   @media print {
-    .noprint { display: none; }
+    body { background: #fff; }
+    .toolbar { display: none; }
+    .page {
+      width: auto; margin: 0; padding: 0; box-shadow: none;
+    }
+    .page:last-of-type { page-break-after: auto; break-after: auto; }
     .fill { background: transparent; }
   }
 </style></head><body>
-<div class="noprint">
-  <div class="notice">本書式は様式第47号・第48号に準拠した下書きです。提出先の警察署・都道府県警の最新様式を必ず確認してください。下線部はクリックして直接編集できます。</div>
-  <button onclick="window.print()">印刷 / PDFに保存</button>
-  <button onclick="window.close()">閉じる</button>
+<div class="toolbar">
+  <div class="bar">
+    <strong>届出書類の下書き(2枚) — 様式第47号・第48号</strong>
+    <div>
+      <button class="primary" onclick="window.print()">印刷 / PDFに保存</button>
+      <button onclick="window.close()">閉じる</button>
+    </div>
+  </div>
+  <div class="notice">水色の下線部はクリックしてそのまま編集できます(印刷時は色が消えます)。本書式は様式に準拠した下書きです。提出先の警察署・都道府県警の最新様式を必ず確認してください。</div>
 </div>
 ${form47Html(project)}
 ${form48Html(project)}
