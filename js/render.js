@@ -666,7 +666,7 @@
     ctx.restore();
   }
 
-  /* 営業所求積図: 壁芯線(一点鎖線)と辺長・頂点番号を描く。
+  /* 営業所求積図: 壁芯線(実線)と辺長・頂点番号を描く。
    * 頂点番号(P1, P2 …)は壁芯の座標求積表と対応する。 */
   function drawPremiseCenterline(ctx, project) {
     const pr = project.premise;
