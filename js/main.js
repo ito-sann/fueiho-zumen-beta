@@ -274,6 +274,7 @@
     $('metaAuthor').value = m.author;
     $('fixNote').value = m.lightingNote || '';
     $('metaFrame').checked = m.showPaperFrame !== false;
+    $('metaFontScale').value = String(m.fontScale || 100);
     $('metaStore').oninput = (e) => m.storeName = e.target.value;
     $('metaAddr').oninput  = (e) => m.address = e.target.value;
     $('metaAuthor').oninput= (e) => m.author = e.target.value;
@@ -282,6 +283,7 @@
     $('metaPaper').onchange = (e) => { m.paper = e.target.value; draw(); };
     $('metaOrient').onchange= (e) => { m.orientation = e.target.value; draw(); };
     $('metaFrame').onchange = (e) => { m.showPaperFrame = e.target.checked; draw(); };
+    $('metaFontScale').onchange = (e) => { m.fontScale = parseInt(e.target.value, 10); draw(); };
     // 設備図コメントは凡例に即時反映させるため、入力のたびに再描画する
     $('fixNote').oninput = (e) => { m.lightingNote = e.target.value; draw(); };
   }
@@ -437,6 +439,10 @@
       html = `<div class="prop-row"><span>種別</span><b>${kindLabel(el, kind)}</b></div>`;
     }
     html += propText('ラベル', 'label', el.label);
+    // ラベルを持つ要素は文字サイズを個別に指定できる(空欄なら全体設定に従う)
+    if (kind === 'regions' || kind === 'furniture' || kind === 'fittings') {
+      html += propNum('文字サイズ(mm)', 'fontMm', el.fontMm || '');
+    }
     html += propNum('X位置(mm)', 'x', el.x);
     html += propNum('Y位置(mm)', 'y', el.y);
     if (kind === 'furniture' || kind === 'fittings') {

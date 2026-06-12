@@ -29,6 +29,17 @@
   function wpx(mm) {
     return mm * view.zoom;
   }
+
+  /* 文字サイズの倍率(図面情報の「文字サイズ」設定)。render() の最初に更新する。 */
+  let fontScale = 1;
+
+  /* ラベル文字のサイズ(px)を求める。
+   *   defaultMm … 既定の実寸(mm)
+   *   el        … 要素。el.fontMm が指定されていれば全体設定より優先する。 */
+  function fontPx(defaultMm, el) {
+    const mm = (el && el.fontMm > 0) ? el.fontMm : defaultMm * fontScale;
+    return wpx(mm);
+  }
   function screenToWorld(px, py) {
     return { x: (px - view.offsetX) / view.zoom, y: (py - view.offsetY) / view.zoom };
   }
@@ -136,11 +147,11 @@
     ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : '#333');
     ctx.stroke();
-    // ラベルは重心に置く(実寸320mm相当の固定サイズ)
+    // ラベルは重心に置く(既定320mm相当・全体設定・個別指定で調整可)
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
     ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
-    ctx.font = `${wpx(320)}px sans-serif`;
+    ctx.font = `${fontPx(320, r)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText((opts.code ? opts.code + ' ' : '') + r.label, cx, cy);
@@ -167,7 +178,7 @@
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
     ctx.save();
-    ctx.font = `${wpx(240)}px sans-serif`;
+    ctx.font = `${fontPx(240)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (let i = 0; i < pts.length; i++) {
@@ -235,9 +246,9 @@
     ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : '#333');
     ctx.stroke();
-    // ラベル(符号つき)。文字は実寸320mm相当(図面に対して固定サイズ)
+    // ラベル(符号つき)。既定は実寸320mm相当(全体設定・個別指定で調整可)
     ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
-    ctx.font = `${wpx(320)}px sans-serif`;
+    ctx.font = `${fontPx(320, r)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const label = (opts.code ? opts.code + ' ' : '') + r.label;
@@ -258,7 +269,7 @@
     ctx.strokeStyle = '#1565c0';
     ctx.fillStyle = '#1565c0';
     ctx.lineWidth = 1;
-    ctx.font = `${wpx(240)}px sans-serif`;
+    ctx.font = `${fontPx(240)}px sans-serif`;
     ctx.textAlign = 'center';
     // 底辺/幅(下辺の外側)
     const by = h / 2 + off;
@@ -304,10 +315,11 @@
     ctx.lineWidth = opts.selected ? 3 : 1.5;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : (over ? '#c62828' : '#555');
     ctx.strokeRect(-w / 2, -h / 2, w, h);
-    // ラベルは実寸200mm相当。小さすぎる備品(つい立て等)には描かない
-    if (Math.min(w, h) > wpx(380)) {
+    // ラベルは既定200mm相当(調整可)。文字より小さい備品(つい立て等)には描かない
+    const fpx = fontPx(200, f);
+    if (Math.min(w, h) > fpx * 1.7) {
       ctx.fillStyle = '#333';
-      ctx.font = `${wpx(200)}px sans-serif`;
+      ctx.font = `${fpx}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(f.label, 0, 0);
@@ -358,7 +370,7 @@
       ctx.stroke();
       arrow(ctx, -w / 2 + 2, 0, w / 2 - 2, 0); // 両矢印
       ctx.fillStyle = line;
-      ctx.font = `${wpx(200)}px sans-serif`;
+      ctx.font = `${fontPx(200, g)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillText('出入口', 0, h / 2 + wpx(50));
@@ -615,6 +627,7 @@
 
   function render(ctx, canvas, project, state) {
     const vis = visibility(currentLayer);
+    fontScale = (project.meta.fontScale || 100) / 100; // 全体の文字サイズ設定を反映
     clear(ctx, canvas);
     drawGrid(ctx, canvas);
     if (project.meta.showPaperFrame) {
