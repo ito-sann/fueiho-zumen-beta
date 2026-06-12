@@ -321,10 +321,10 @@
     ctx.strokeStyle = opts.selected ? '#d32f2f' : (over ? '#c62828' : '#555');
     ctx.strokeRect(-w / 2, -h / 2, w, h);
     // ラベルは既定200mm相当(調整可)。文字より小さい備品(つい立て等)には描かない
-    // 番号(①②…)を付けて、同じ種類でもサイズ違いを区別できるようにする
+    // 番号(①②…)はサイズ違いの区別用(同じ種類・同じ寸法なら同じ番号)
     const fpx = fontPx(200, f);
     if (Math.min(w, h) > fpx * 1.7) {
-      const num = typeof f.number === 'number' ? global.Geometry.code(f.number) : '';
+      const num = opts.num ? global.Geometry.code(opts.num) : '';
       ctx.fillStyle = '#333';
       ctx.font = `${fpx}px sans-serif`;
       ctx.textAlign = 'center';
@@ -775,9 +775,8 @@
       const over = g.over;
       const line = over ? '#c62828' : '#333';
       const fill = over ? 'rgba(255,205,210,0.5)' : 'rgba(250,250,250,0.9)';
-      // ラベル(品名 + 番号 + 台数)
-      const codes = g.numbers.map((n) => G.code(n)).join('');
-      const name = `${g.label}${codes}(${g.count}台)` + (over ? ' ⚠高さ1m超' : '');
+      // ラベル(品名 + サイズ番号 + 台数)
+      const name = `${g.label}${G.code(g.number)}(${g.count}台)` + (over ? ' ⚠高さ1m超' : '');
       const lp = worldToScreen(c.x, c.floorY - g.height - 250);
       ctx.fillStyle = over ? '#c62828' : '#222';
       ctx.font = `bold ${fontPx(260)}px sans-serif`;
@@ -906,8 +905,9 @@
       }
     }
     if (vis.furniture) {
+      const nums = global.Geometry.furnitureNumberMap(project);
       for (const f of project.furniture) {
-        drawFurniture(ctx, f, { selected: state.selectedId === f.id });
+        drawFurniture(ctx, f, { selected: state.selectedId === f.id, num: nums[f.id] });
       }
     }
     if (vis.fixtures) {

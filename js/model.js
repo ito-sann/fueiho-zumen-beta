@@ -225,23 +225,11 @@
     return project.premise;
   }
 
-  /* 備品の種類ごとの通し番号(テーブル1, テーブル2 …)を採番 */
-  function nextFurnitureNumber(project, kind) {
-    let max = 0;
-    for (const f of project.furniture) {
-      if (f.kind === kind && typeof f.number === 'number') {
-        max = Math.max(max, f.number);
-      }
-    }
-    return max + 1;
-  }
-
   function addFurniture(project, kind) {
     const c = FURNITURE_CATALOG[kind];
     const item = {
       id: nextId(project, 'f'),
       kind,
-      number: nextFurnitureNumber(project, kind),
       label: c.label,
       x: 1500,
       y: 1500,
@@ -326,18 +314,6 @@
     project.premise = obj.premise || null;
     project.checklist = Object.assign({ corp: false, items: {} }, obj.checklist || {});
     project.checklist.items = (obj.checklist && obj.checklist.items) || {};
-    // 旧データの備品に番号がなければ、種類ごとに順番に振り直す
-    const maxNum = {};
-    for (const f of project.furniture) {
-      if (typeof f.number === 'number') {
-        maxNum[f.kind] = Math.max(maxNum[f.kind] || 0, f.number);
-      }
-    }
-    for (const f of project.furniture) {
-      if (typeof f.number !== 'number') {
-        f.number = (maxNum[f.kind] = (maxNum[f.kind] || 0) + 1);
-      }
-    }
     if (typeof project._seq !== 'number') {
       project._seq = 1 + project.regions.length + project.furniture.length +
                      project.fittings.length + project.fixtures.length;
@@ -348,7 +324,7 @@
   global.Model = {
     REGION_TYPES, FURNITURE_CATALOG, FITTING_CATALOG, FIXTURE_CATALOG, PAPER_SIZES,
     SIGHTLINE_LIMIT, CHECKLIST_ITEMS,
-    todayStr, defaultProject, nextId, nextRegionNumber, nextFurnitureNumber,
+    todayStr, defaultProject, nextId, nextRegionNumber,
     addRegion, addPolygonRegion, normalizePolygon, setPremise,
     addFurniture, addFitting, addFixture, removeById, findById,
     serialize, deserialize,

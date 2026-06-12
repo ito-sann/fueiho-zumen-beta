@@ -83,8 +83,7 @@
   function furnTableHtml(project) {
     const groups = global.Geometry.furnitureGroups(project);
     let rows = groups.map((g) => {
-      const codes = g.numbers.map((n) => global.Geometry.code(n)).join('');
-      return `<tr><td>${escapeHtml(g.label)}${codes}</td><td class="num">${g.w}×${g.h}</td>
+      return `<tr><td>${escapeHtml(g.label)}${global.Geometry.code(g.number)}</td><td class="num">${g.w}×${g.h}</td>
         <td class="num">${g.height}</td><td class="num">${g.count}</td>
         <td>${g.over ? '高さ1m超' : '—'}</td></tr>`;
     }).join('');

@@ -474,9 +474,8 @@
   function furnTableHtml() {
     const groups = G.furnitureGroups(project);
     let rows = groups.map((g) => {
-      const codes = g.numbers.map((n) => G.code(n)).join('');
       const warn = g.over ? '<span class="ng-text">高さ1m超</span>' : '—';
-      return `<tr><td>${esc(g.label)}${codes}</td><td>${g.w}×${g.h}</td>
+      return `<tr><td>${esc(g.label)}${G.code(g.number)}</td><td>${g.w}×${g.h}</td>
         <td>${g.height}</td><td>${g.count}</td><td>${warn}</td></tr>`;
     }).join('');
     if (!rows) rows = '<tr><td colspan="5" class="muted">備品がありません</td></tr>';
@@ -598,7 +597,10 @@
     }
     if (kind === 'furniture') {
       html += propNum('高さ(mm)', 'height', el.height || 0);
-      html += propNum('番号', 'number', el.number || 0);
+      // 番号はサイズ違いの区別用に自動で決まる(同じ種類・同じ寸法 = 同じ番号)
+      const num = G.furnitureNumberMap(project)[el.id];
+      html += `<div class="prop-row"><span>番号</span><b id="propFurnNum">${num ? G.code(num) : '—'}</b></div>
+        <p class="muted">番号は自動: 同じ種類・同じ寸法は同じ番号。寸法を変えると振り直されます。</p>`;
     }
     if (kind === 'fixtures') {
       html += propText('ワット数', 'watt', el.watt || '');
@@ -654,6 +656,12 @@
         // 面積表示を即時に更新(幅・奥行の変更に追従)
         const areaEl = box.querySelector('#propArea');
         if (areaEl) areaEl.textContent = G.regionAreaSqm(el).toFixed(4) + ' ㎡';
+        // 備品の番号表示も即時に更新(寸法の変更で振り直されるため)
+        const numEl = box.querySelector('#propFurnNum');
+        if (numEl) {
+          const n = G.furnitureNumberMap(project)[el.id];
+          numEl.textContent = n ? G.code(n) : '—';
+        }
       });
     });
     // 文字サイズ(Googleドキュメント風)。15が標準で、−/＋は段階リストの

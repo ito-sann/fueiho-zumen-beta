@@ -213,26 +213,44 @@
     return { regionLike: rl, rows: c.rows, doubleArea: c.doubleArea, area4: c.area4, total: round2(c.area4) };
   }
 
-  /* ---- 備品姿図用: 同じ種類・同じ寸法の備品をまとめる ---- */
+  /* ---- 備品の番号と姿図用グループ ----
+   * 番号はサイズ違いを区別するためのもの: 同じ種類・同じ寸法(幅×奥行×高さ)は
+   * 同じ番号になり、同種で寸法が違うものが増えるたびに②③…と増える(登場順)。
+   * 保存はせず、その時点の寸法から毎回計算する(寸法変更で自動的に振り直る)。 */
+  function furnitureNumberMap(project) {
+    const counters = {};       // 種類 → 次の番号
+    const variant = new Map(); // 種類|幅|奥行|高さ → 番号
+    const map = {};
+    for (const f of project.furniture) {
+      const key = `${f.kind}|${f.w}|${f.h}|${f.height || 0}`;
+      if (!variant.has(key)) {
+        counters[f.kind] = (counters[f.kind] || 0) + 1;
+        variant.set(key, counters[f.kind]);
+      }
+      map[f.id] = variant.get(key);
+    }
+    return map;
+  }
+
+  /* 備品姿図用: 同じ種類・同じ寸法の備品をまとめる(番号は furnitureNumberMap と同じ) */
   function furnitureGroups(project) {
     const limit = global.Model.SIGHTLINE_LIMIT;
+    const counters = {};
     const map = new Map();
     for (const f of project.furniture) {
       const key = `${f.kind}|${f.w}|${f.h}|${f.height || 0}`;
       if (!map.has(key)) {
+        counters[f.kind] = (counters[f.kind] || 0) + 1;
         map.set(key, {
           kind: f.kind, label: f.label,
           w: f.w, h: f.h, height: f.height || 0,
-          numbers: [], count: 0,
+          number: counters[f.kind], count: 0,
           over: (f.height || 0) > limit, // 高さ1m超(見通し規制の注意対象)
         });
       }
-      const g = map.get(key);
-      g.count++;
-      if (typeof f.number === 'number') g.numbers.push(f.number);
+      map.get(key).count++;
     }
     const groups = Array.from(map.values());
-    for (const g of groups) g.numbers.sort((a, b) => a - b);
     // カタログの並び順 → 大きさ順で安定させる
     const order = Object.keys(global.Model.FURNITURE_CATALOG);
     groups.sort((a, b) =>
@@ -331,7 +349,7 @@
     mmToM, fmtM, code, regionCalc, regionAreaSqm, regionRow, buildTable,
     polygonCalc, polygonEdgesM, polygonPointsM,
     offsetPolygonAbs, premiseCenterlineAbs, premiseWallPolysAbs, premiseRegionLike, premiseCalc,
-    furnitureGroups,
+    furnitureGroups, furnitureNumberMap,
     summary, sightlineWarnings, kyakushitsuSizeWarnings, KYAKUSHITSU_MIN_SQM,
     fixtureSummary, boundingBox,
   };
