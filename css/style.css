@@ -125,6 +125,7 @@ table.kyuseki tfoot td { font-weight: 700; background: #f1f5f9; }
 
 .warn .ok { color: #15803d; font-size: 12px; margin: 0 0 4px; }
 .warn .ng { color: #b91c1c; font-size: 12px; font-weight: 600; margin: 0 0 4px; }
+.ng-text { color: #b91c1c; font-weight: 600; }
 .warn ul { margin: 4px 0; padding-left: 18px; font-size: 12px; color: #b91c1c; }
 .muted { color: #94a3b8; font-size: 12px; }
 

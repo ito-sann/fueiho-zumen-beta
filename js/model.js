@@ -105,7 +105,18 @@
         northAngle: 0,        // 方位記号の角度(度)。0 = 真上が北
         showNorthMark: false, // 方位記号(N)を表示するか。既定は非表示
         fontScale: 100,       // 図面内ラベルの文字サイズ(%)。要素ごとの fontMm が優先
+        /* 営業所求積の方式(警察署のローカルルールに合わせて選ぶ):
+         *   'regions'    … 区画の合計(内法)
+         *   'centerline' … 壁芯の外周(座標法)
+         *   'both'       … 両方を併記 */
+        premisesMethod: 'regions',
+        /* 求積図の線色: 'mono'=黒 / 'police'=営業所:青・客室:赤・調理場:緑(慣行色) */
+        colorMode: 'mono',
       },
+      /* 営業所外周(壁芯求積用)。多角形1つ + 壁厚。未作成なら null。
+       *   measuredAt: 'inner'=内側の寸法で入力(壁芯線は壁厚/2だけ外側に自動生成)
+       *               'center'=壁芯の寸法で入力(そのまま壁芯線になる) */
+      premise: null,
       regions: [],
       furniture: [],
       fittings: [],
@@ -193,11 +204,44 @@
     region.h = Math.max(...region.points.map((p) => p.y));
   }
 
+  /* 営業所外周を作成する。pointsAbs は絶対座標(mm)の頂点列(3点以上)。
+   * 多角形区画と同じく「左上原点 + 相対頂点」で持ち、頂点ドラッグも共通で使える。 */
+  function setPremise(project, pointsAbs, wallThickness, measuredAt) {
+    const minX = Math.min(...pointsAbs.map((p) => p.x));
+    const minY = Math.min(...pointsAbs.map((p) => p.y));
+    project.premise = {
+      id: 'premise',
+      label: '営業所外周',
+      shape: 'polygon',
+      x: minX,
+      y: minY,
+      w: 0,
+      h: 0,
+      points: pointsAbs.map((p) => ({ x: p.x - minX, y: p.y - minY })),
+      wallThickness: Math.max(10, wallThickness | 0) || 100,
+      measuredAt: measuredAt === 'center' ? 'center' : 'inner',
+    };
+    normalizePolygon(project.premise);
+    return project.premise;
+  }
+
+  /* 備品の種類ごとの通し番号(テーブル1, テーブル2 …)を採番 */
+  function nextFurnitureNumber(project, kind) {
+    let max = 0;
+    for (const f of project.furniture) {
+      if (f.kind === kind && typeof f.number === 'number') {
+        max = Math.max(max, f.number);
+      }
+    }
+    return max + 1;
+  }
+
   function addFurniture(project, kind) {
     const c = FURNITURE_CATALOG[kind];
     const item = {
       id: nextId(project, 'f'),
       kind,
+      number: nextFurnitureNumber(project, kind),
       label: c.label,
       x: 1500,
       y: 1500,
@@ -242,6 +286,10 @@
   }
 
   function removeById(project, id) {
+    if (project.premise && project.premise.id === id) {
+      project.premise = null;
+      return true;
+    }
     for (const key of ['regions', 'furniture', 'fittings', 'fixtures']) {
       const i = project[key].findIndex((e) => e.id === id);
       if (i >= 0) { project[key].splice(i, 1); return true; }
@@ -250,6 +298,9 @@
   }
 
   function findById(project, id) {
+    if (project.premise && project.premise.id === id) {
+      return { element: project.premise, kind: 'premise' };
+    }
     for (const key of ['regions', 'furniture', 'fittings', 'fixtures']) {
       const e = project[key].find((e) => e.id === id);
       if (e) return { element: e, kind: key };
@@ -272,8 +323,21 @@
     project.furniture = obj.furniture || [];
     project.fittings = obj.fittings || [];
     project.fixtures = obj.fixtures || [];
+    project.premise = obj.premise || null;
     project.checklist = Object.assign({ corp: false, items: {} }, obj.checklist || {});
     project.checklist.items = (obj.checklist && obj.checklist.items) || {};
+    // 旧データの備品に番号がなければ、種類ごとに順番に振り直す
+    const maxNum = {};
+    for (const f of project.furniture) {
+      if (typeof f.number === 'number') {
+        maxNum[f.kind] = Math.max(maxNum[f.kind] || 0, f.number);
+      }
+    }
+    for (const f of project.furniture) {
+      if (typeof f.number !== 'number') {
+        f.number = (maxNum[f.kind] = (maxNum[f.kind] || 0) + 1);
+      }
+    }
     if (typeof project._seq !== 'number') {
       project._seq = 1 + project.regions.length + project.furniture.length +
                      project.fittings.length + project.fixtures.length;
@@ -284,8 +348,8 @@
   global.Model = {
     REGION_TYPES, FURNITURE_CATALOG, FITTING_CATALOG, FIXTURE_CATALOG, PAPER_SIZES,
     SIGHTLINE_LIMIT, CHECKLIST_ITEMS,
-    todayStr, defaultProject, nextId, nextRegionNumber,
-    addRegion, addPolygonRegion, normalizePolygon,
+    todayStr, defaultProject, nextId, nextRegionNumber, nextFurnitureNumber,
+    addRegion, addPolygonRegion, normalizePolygon, setPremise,
     addFurniture, addFitting, addFixture, removeById, findById,
     serialize, deserialize,
   };

@@ -110,6 +110,7 @@
     // 作図中にもう一度押すと: 3点以上なら確定、未満なら中止。
     $('btnDrawPoly').onclick = () => {
       if (state.draft) {
+        if (state.draftKind !== 'region') return; // 外周の作図中は区画ボタンを無効に
         if (state.draft.points.length >= 3) I.finishPolygon(state);
         else I.cancelPolygon(state);
         draw();
@@ -117,6 +118,7 @@
       }
       const type = $('regionType').value;
       ensureRegionVisible(type); // 今のレイヤーで見えない種類なら平面図へ切り替え
+      state.draftKind = 'region';
       I.beginPolygon(state, (pts) => {
         const r = M.addPolygonRegion(project, type, pts);
         state.selectedId = r.id;
@@ -124,7 +126,63 @@
       });
       draw();
     };
+    // 営業所外周(壁芯)の作図。区画の多角形と同じ操作で外周をなぞる。
+    $('btnDrawPremise').onclick = () => {
+      if (state.draft) {
+        if (state.draftKind !== 'premise') return; // 区画の作図中は外周ボタンを無効に
+        if (state.draft.points.length >= 3) I.finishPolygon(state);
+        else I.cancelPolygon(state);
+        draw();
+        return;
+      }
+      if (project.premise && !confirm('営業所外周はすでにあります。描き直しますか?')) return;
+      if (R.getLayer() !== 'plan' && R.getLayer() !== 'premises') {
+        R.setLayer('plan');
+        buildLayerTabs();
+      }
+      state.draftKind = 'premise';
+      I.beginPolygon(state, (pts) => {
+        const pr = M.setPremise(project, pts,
+          parseInt($('premWall').value, 10) || 100, $('premMeasured').value);
+        state.selectedId = pr.id;
+        refresh(); showProps(pr);
+      });
+      draw();
+    };
+    // 区画全体を囲う長方形で外周を自動作成(内法入力扱い)。あとから頂点で修正できる。
+    $('btnPremAuto').onclick = () => {
+      if (!project.regions.length) {
+        alert('区画がありません。先に客室・厨房などの区画を置いてください。');
+        return;
+      }
+      if (project.premise && !confirm('営業所外周はすでにあります。作り直しますか?')) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const r of project.regions) {
+        minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
+        maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.h);
+      }
+      const pr = M.setPremise(project,
+        [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }],
+        parseInt($('premWall').value, 10) || 100, $('premMeasured').value);
+      state.selectedId = pr.id;
+      R.fitToView(project, canvasCss());
+      refresh(); showProps(pr);
+    };
+    // 壁厚・測り方の変更は、作成済みの外周にも即時反映する
+    $('premWall').onchange = (e) => {
+      if (project.premise) {
+        project.premise.wallThickness = Math.max(10, parseInt(e.target.value, 10) || 100);
+        refresh();
+      }
+    };
+    $('premMeasured').onchange = (e) => {
+      if (project.premise) {
+        project.premise.measuredAt = e.target.value;
+        refresh();
+      }
+    };
     $('btnAddFurn').onclick = () => {
+      if (R.getLayer() === 'furnviews') { R.setLayer('plan'); buildLayerTabs(); } // 姿図では配置できない
       const f = M.addFurniture(project, $('furnKind').value);
       placeAtViewCenter(f);
       state.selectedId = f.id;
@@ -201,24 +259,30 @@
     });
   }
 
-  /* 作図モード中のボタン表示とヒント文を切り替える */
+  /* 作図モード中のボタン表示とヒント文を切り替える。
+   * 区画(btnDrawPoly)と営業所外周(btnDrawPremise)のどちらの作図かは state.draftKind で判定。 */
   const HINT_DEFAULT = '空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(既定1cm吸着・Shiftで自由)/ 矢印キーで微調整(Shiftで10倍)/ Deleteで削除';
   const HINT_DRAFT = '多角形の作図中: クリックで角を置く / 最初の点をクリック・ダブルクリック・Enterで確定 / Escで中止';
   function setDraftUi(draft) {
-    const btn = $('btnDrawPoly');
+    const btnR = $('btnDrawPoly');
+    const btnP = $('btnDrawPremise');
+    btnR.textContent = '多角形で描く';
+    btnP.textContent = '外周を多角形で描く';
+    btnR.classList.remove('danger');
+    btnP.classList.remove('danger');
     if (!draft) {
-      btn.textContent = '多角形で描く';
-      btn.classList.remove('danger');
+      state.draftKind = null;
       $('hint').textContent = HINT_DEFAULT;
-    } else if (draft.points.length >= 3) {
+      return;
+    }
+    const btn = state.draftKind === 'premise' ? btnP : btnR;
+    if (draft.points.length >= 3) {
       btn.textContent = '作図を確定';
-      btn.classList.remove('danger');
-      $('hint').textContent = HINT_DRAFT;
     } else {
       btn.textContent = '作図を中止(Esc)';
       btn.classList.add('danger');
-      $('hint').textContent = HINT_DRAFT;
     }
+    $('hint').textContent = HINT_DRAFT;
   }
 
   /* 区画の種類が今のレイヤーで非表示なら、平面図に切り替えて見えるようにする */
@@ -276,6 +340,10 @@
     $('metaFrame').checked = m.showPaperFrame !== false;
     $('metaNorth').checked = m.showNorthMark === true;
     $('metaFontScale').value = String(m.fontScale || 100);
+    $('metaColors').value = m.colorMode || 'mono';
+    $('premMethod').value = m.premisesMethod || 'regions';
+    $('premWall').value = project.premise ? project.premise.wallThickness : 100;
+    $('premMeasured').value = project.premise ? project.premise.measuredAt : 'inner';
     $('metaStore').oninput = (e) => m.storeName = e.target.value;
     $('metaAddr').oninput  = (e) => m.address = e.target.value;
     $('metaAuthor').oninput= (e) => m.author = e.target.value;
@@ -286,6 +354,9 @@
     $('metaFrame').onchange = (e) => { m.showPaperFrame = e.target.checked; draw(); };
     $('metaNorth').onchange = (e) => { m.showNorthMark = e.target.checked; draw(); };
     $('metaFontScale').onchange = (e) => { m.fontScale = parseInt(e.target.value, 10); draw(); };
+    $('metaColors').onchange = (e) => { m.colorMode = e.target.value; draw(); };
+    // 営業所求積の方式(署のローカルルール)。求積表とサマリーに反映する
+    $('premMethod').onchange = (e) => { m.premisesMethod = e.target.value; refresh(); };
     // 設備図コメントは凡例に即時反映させるため、入力のたびに再描画する
     $('fixNote').oninput = (e) => { m.lightingNote = e.target.value; draw(); };
   }
@@ -304,8 +375,19 @@
 
   function renderSummary() {
     const s = G.summary(project);
-    $('summaryTable').innerHTML = `
-      <tr><th>営業所面積</th><td>${s.premises.toFixed(2)} ㎡</td></tr>
+    const method = project.meta.premisesMethod || 'regions';
+    const cl = project.premise ? G.premiseCalc(project.premise).total : null;
+    const clText = cl != null ? `${cl.toFixed(2)} ㎡` : '<span class="muted">外周未作成</span>';
+    let rows = '';
+    if (method === 'centerline') {
+      rows += `<tr><th>営業所面積(壁芯)</th><td>${clText}</td></tr>`;
+    } else if (method === 'both') {
+      rows += `<tr><th>営業所面積(壁芯)</th><td>${clText}</td></tr>
+               <tr><th>営業所面積(内法合計)</th><td>${s.premises.toFixed(2)} ㎡</td></tr>`;
+    } else {
+      rows += `<tr><th>営業所面積</th><td>${s.premises.toFixed(2)} ㎡</td></tr>`;
+    }
+    $('summaryTable').innerHTML = rows + `
       <tr><th>客室面積</th><td>${s.kyakushitsu.toFixed(2)} ㎡</td></tr>
       <tr><th>厨房面積</th><td>${s.chubo.toFixed(2)} ㎡</td></tr>
       <tr><th>トイレ面積</th><td>${s.toilet.toFixed(2)} ㎡</td></tr>
@@ -365,6 +447,47 @@
       .map(coordTableHtml).join('');
   }
 
+  /* 壁芯外周の求積表(座標法)。外周が未作成なら案内を出す。 */
+  function premiseKyusekiHtml() {
+    if (!project.premise) {
+      return `<div class="kyuseki-title">営業所求積表(壁芯)</div>
+        <p class="muted">営業所外周が未作成です。左の「営業所外周(壁芯)」で作成してください。</p>`;
+    }
+    const c = G.premiseCalc(project.premise);
+    const rows = c.rows.map((row) =>
+      `<tr><td>P${row.no}</td><td>${row.x.toFixed(2)}</td><td>${row.y.toFixed(2)}</td>
+       <td>${row.dy.toFixed(2)}</td><td>${row.prod.toFixed(4)}</td></tr>`).join('');
+    return `
+      <div class="kyuseki-title">営業所求積表(壁芯・座標法)</div>
+      <table class="kyuseki coord">
+        <thead><tr><th>点</th><th>X(m)</th><th>Y(m)</th><th>Y次−Y前</th><th>X×(Y次−Y前)</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr><td colspan="4">倍面積</td><td>${c.doubleArea.toFixed(4)}</td></tr>
+          <tr><td colspan="4">面積(倍面積÷2)</td><td>${c.area4.toFixed(4)} ㎡</td></tr>
+          <tr><td colspan="4">営業所面積(壁芯)</td><td>${c.total.toFixed(2)} ㎡</td></tr>
+        </tfoot>
+      </table>`;
+  }
+
+  /* 備品一覧表(備品姿図に添える)。同じ種類・寸法をまとめ、番号と高さを示す。 */
+  function furnTableHtml() {
+    const groups = G.furnitureGroups(project);
+    let rows = groups.map((g) => {
+      const codes = g.numbers.map((n) => G.code(n)).join('');
+      const warn = g.over ? '<span class="ng-text">高さ1m超</span>' : '—';
+      return `<tr><td>${esc(g.label)}${codes}</td><td>${g.w}×${g.h}</td>
+        <td>${g.height}</td><td>${g.count}</td><td>${warn}</td></tr>`;
+    }).join('');
+    if (!rows) rows = '<tr><td colspan="5" class="muted">備品がありません</td></tr>';
+    return `
+      <div class="kyuseki-title">備品一覧表</div>
+      <table class="kyuseki">
+        <thead><tr><th>品名(番号)</th><th>幅×奥行(mm)</th><th>高さ(mm)</th><th>数量</th><th>備考</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
   function renderKyuseki() {
     const layer = R.getLayer();
     let html;
@@ -375,9 +498,19 @@
              coordTablesHtml(['kyakushitsu', 'chubo']);
     } else if (layer === 'lighting') {
       html = fixtureTableHtml();
+    } else if (layer === 'furnviews') {
+      html = furnTableHtml();
     } else {
-      html = kyusekiTableHtml('営業所求積表', G.buildTable(project, null)) +
-             coordTablesHtml(null);
+      // 営業所求積: 方式(区画合計/壁芯/両方)に応じて出し分ける
+      const method = project.meta.premisesMethod || 'regions';
+      const parts = [];
+      if (method !== 'regions') parts.push(premiseKyusekiHtml());
+      if (method !== 'centerline') {
+        parts.push(kyusekiTableHtml(
+          method === 'both' ? '営業所求積表(内法・区画合計)' : '営業所求積表',
+          G.buildTable(project, null)) + coordTablesHtml(null));
+      }
+      html = parts.join('');
     }
     $('kyusekiBox').innerHTML = html;
   }
@@ -465,10 +598,24 @@
     }
     if (kind === 'furniture') {
       html += propNum('高さ(mm)', 'height', el.height || 0);
+      html += propNum('番号', 'number', el.number || 0);
     }
     if (kind === 'fixtures') {
       html += propText('ワット数', 'watt', el.watt || '');
       html += propText('型番メモ', 'model', el.model || '');
+    }
+    if (kind === 'premise') {
+      // 壁厚・測り方は左の「営業所外周(壁芯)」欄から変更する(入力欄を1か所にまとめる)
+      const c = G.premiseCalc(el);
+      html += `<div class="prop-row"><span>壁厚</span><b>${el.wallThickness} mm</b></div>`;
+      html += `<div class="prop-row"><span>測り方</span><b>${el.measuredAt === 'center' ? '壁芯の寸法' : '内側の寸法(内法)'}</b></div>`;
+      html += `<div class="prop-row"><span>面積(壁芯)</span><b>${c.total.toFixed(2)} ㎡</b></div>`;
+      html += '<p class="muted">壁厚・測り方は左の「営業所外周(壁芯)」欄で変更できます。頂点はキャンバス上でドラッグでも動かせます。</p>';
+      el.points.forEach((p, i) => {
+        html += `<div class="prop-row vertex-row"><span>P${i + 1}</span>
+          <input type="number" step="10" data-vx="${i}" value="${el.x + p.x}" title="X(mm)">
+          <input type="number" step="10" data-vy="${i}" value="${el.y + p.y}" title="Y(mm)"></div>`;
+      });
     }
     if (kind === 'regions') {
       const shape = el.shape || 'rect';
@@ -583,6 +730,7 @@
 
   function kindLabel(el, kind) {
     if (kind === 'regions') return (M.REGION_TYPES[el.type] || {}).label || '区画';
+    if (kind === 'premise') return '営業所外周(壁芯)';
     if (kind === 'furniture') return '備品';
     if (kind === 'fittings') return '建具・設備';
     return '照明・音響';

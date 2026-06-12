@@ -14,6 +14,7 @@
     premises:  { label: '営業所求積図' },
     kyakushitsu: { label: '客室・調理場求積図' },
     lighting:  { label: '照明・音響設備図' },
+    furnviews: { label: '備品姿図' },
   };
   let currentLayer = 'plan';
 
@@ -48,7 +49,9 @@
 
   /* 全要素が収まるようにビューを合わせる(用紙枠の表示中は枠も含める) */
   function fitToView(project, canvas) {
-    let bb = global.Geometry.boundingBox(project);
+    let bb = currentLayer === 'furnviews'
+      ? furnViewLayout(project).bounds
+      : global.Geometry.boundingBox(project);
     if (project.meta.showPaperFrame) {
       const f = paperFrameWorld(project);
       const minX = Math.min(bb.x, f.x), minY = Math.min(bb.y, f.y);
@@ -147,7 +150,7 @@
       ctx.globalAlpha = 1;
     }
     ctx.lineWidth = opts.selected ? 3 : 2;
-    ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : '#333');
+    ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : (opts.stroke || '#333'));
     ctx.stroke();
     // ラベルは重心に置く(既定320mm相当・全体設定・個別指定で調整可)
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
@@ -246,7 +249,7 @@
       ctx.globalAlpha = 1;
     }
     ctx.lineWidth = opts.selected ? 3 : 2;
-    ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : '#333');
+    ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : (opts.stroke || '#333'));
     ctx.stroke();
     // ラベル(符号つき)。既定は実寸320mm相当(全体設定・個別指定で調整可)
     ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
@@ -318,13 +321,15 @@
     ctx.strokeStyle = opts.selected ? '#d32f2f' : (over ? '#c62828' : '#555');
     ctx.strokeRect(-w / 2, -h / 2, w, h);
     // ラベルは既定200mm相当(調整可)。文字より小さい備品(つい立て等)には描かない
+    // 番号(①②…)を付けて、同じ種類でもサイズ違いを区別できるようにする
     const fpx = fontPx(200, f);
     if (Math.min(w, h) > fpx * 1.7) {
+      const num = typeof f.number === 'number' ? global.Geometry.code(f.number) : '';
       ctx.fillStyle = '#333';
       ctx.font = `${fpx}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(f.label, 0, 0);
+      ctx.fillText(f.label + num, 0, 0);
     }
     ctx.restore();
   }
@@ -604,6 +609,217 @@
     ctx.restore();
   }
 
+  /* ---- 営業所外周(壁)の描画 ---- */
+
+  /* 平面系のレイヤーに壁を二重線で描く。壁厚ぶんの帯を塗り、内外の輪郭線を引く。
+   * 選択中は赤くし、入力した頂点(ドラッグで編集できる点)にハンドルを出す。 */
+  function drawPremiseWalls(ctx, project, opts) {
+    const pr = project.premise;
+    if (!pr || (pr.points || []).length < 3) return;
+    const wp = global.Geometry.premiseWallPolysAbs(pr);
+    const inner = wp.inner.map((p) => worldToScreen(p.x, p.y));
+    const outer = wp.outer.map((p) => worldToScreen(p.x, p.y));
+    ctx.save();
+    // 壁の帯(外側の輪郭と内側の輪郭で囲まれた部分)
+    ctx.beginPath();
+    ctx.moveTo(outer[0].x, outer[0].y);
+    for (let i = 1; i < outer.length; i++) ctx.lineTo(outer[i].x, outer[i].y);
+    ctx.closePath();
+    ctx.moveTo(inner[0].x, inner[0].y);
+    for (let i = 1; i < inner.length; i++) ctx.lineTo(inner[i].x, inner[i].y);
+    ctx.closePath();
+    ctx.globalAlpha = opts.muted ? 0.25 : 0.8;
+    ctx.fillStyle = '#b0bec5';
+    ctx.fill('evenodd');
+    ctx.globalAlpha = 1;
+    // 内外の輪郭線
+    ctx.lineWidth = opts.selected ? 2.5 : 1.5;
+    ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : '#37474f');
+    for (const poly of [outer, inner]) {
+      ctx.beginPath();
+      ctx.moveTo(poly[0].x, poly[0].y);
+      for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+      ctx.closePath();
+      ctx.stroke();
+    }
+    // ラベル(外周の左上の外側)
+    if (!opts.muted) {
+      const top = outer.reduce((a, p) => (p.y < a.y ? p : a), outer[0]);
+      ctx.fillStyle = '#37474f';
+      ctx.font = `${fontPx(240)}px sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`営業所外周(壁厚${pr.wallThickness}mm)`, top.x, top.y - wpx(120));
+    }
+    // 選択中: 入力頂点のハンドル(ドラッグで形を修正できる)
+    if (opts.selected) {
+      for (const p of pr.points) {
+        const s = worldToScreen(pr.x + p.x, pr.y + p.y);
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#d32f2f';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(s.x - 4, s.y - 4, 8, 8);
+        ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  /* 営業所求積図: 壁芯線(一点鎖線)と辺長・頂点番号を描く。
+   * 頂点番号(P1, P2 …)は壁芯の座標求積表と対応する。 */
+  function drawPremiseCenterline(ctx, project) {
+    const pr = project.premise;
+    if (!pr || (pr.points || []).length < 3) return;
+    const rl = global.Geometry.premiseRegionLike(pr);
+    const pts = rl.points.map((p) => worldToScreen(rl.x + p.x, rl.y + p.y));
+    const police = project.meta.colorMode === 'police';
+    ctx.save();
+    ctx.strokeStyle = police ? '#1d4ed8' : '#111';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([wpx(450), wpx(140), wpx(70), wpx(140)]); // 一点鎖線
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    drawPolygonDims(ctx, rl); // 辺長(m)と P1, P2 … を共通処理で付ける
+    // 凡例的なラベル
+    const top = pts.reduce((a, p) => (p.y < a.y ? p : a), pts[0]);
+    ctx.save();
+    ctx.fillStyle = police ? '#1d4ed8' : '#111';
+    ctx.font = `bold ${fontPx(260)}px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('壁芯線(営業所求積)', top.x + wpx(300), top.y - wpx(420));
+    ctx.restore();
+  }
+
+  /* ---- 備品姿図(正面図・側面図) ---- */
+
+  /* 同寸法グループごとのセル配置を計算する(ワールドmm)。
+   * 1セル = ラベル + 正面図(幅×高さ) + 側面図(奥行×高さ) + 寸法。 */
+  function furnViewLayout(project) {
+    const groups = global.Geometry.furnitureGroups(project);
+    const LABEL_H = 700, DIM_H = 900, GAP = 1500, CELL_GAP = 2600, ROW_GAP = 1600;
+    const MAX_W = 14000; // 1行の最大幅(mm)。超えたら折り返す
+    const cells = [];
+    let x = 0, rowTop = 1000, rowMaxH = 0, row = [];
+    const rows = [];
+    const flushRow = () => {
+      if (!row.length) return;
+      // 行内で床の高さ(ベースライン)を揃える
+      const floorY = rowTop + LABEL_H + rowMaxH;
+      for (const c of row) c.floorY = floorY;
+      rows.push({ top: rowTop, floorY, right: x });
+      rowTop = floorY + DIM_H + ROW_GAP;
+      x = 0; rowMaxH = 0; row = [];
+    };
+    for (const g of groups) {
+      const cellW = g.w + GAP + g.h + 1800; // 正面 + 側面 + 高さ寸法の余白
+      if (x > 0 && x + cellW > MAX_W) flushRow();
+      const cell = { g, x: x + 1000, cellW };
+      row.push(cell); cells.push(cell);
+      rowMaxH = Math.max(rowMaxH, g.height);
+      x += cellW + CELL_GAP;
+    }
+    flushRow();
+    const maxRight = rows.reduce((m, r) => Math.max(m, r.right), 6000);
+    const bottom = rows.length ? rows[rows.length - 1].floorY + DIM_H : 4000;
+    return { cells, rows, bounds: { x: 0, y: 0, w: maxRight + 2000, h: bottom + 1000 } };
+  }
+
+  /* 備品姿図を描く。グループごとに正面図と側面図を並べ、寸法と番号を付ける。
+   * 床から1mの位置に基準線を引き、見通し規制(高さ1m)と見比べられるようにする。 */
+  function drawFurnViews(ctx, canvas, project) {
+    const layout = furnViewLayout(project);
+    const G = global.Geometry;
+    ctx.save();
+    // タイトル
+    const t0 = worldToScreen(1000, 300);
+    ctx.fillStyle = '#222';
+    ctx.font = `bold ${fontPx(360)}px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('備品姿図(正面図・側面図) — 基準線は床から1m(見通し規制)', t0.x, t0.y);
+    if (!layout.cells.length) {
+      ctx.font = `${fontPx(300)}px sans-serif`;
+      ctx.fillStyle = '#777';
+      ctx.fillText('備品がありません。平面図で備品を追加してください。', t0.x, t0.y + wpx(700));
+      ctx.restore();
+      return;
+    }
+    for (const r of layout.rows) {
+      // 床線(行ごと)
+      const f1 = worldToScreen(600, r.floorY), f2 = worldToScreen(r.right + 600, r.floorY);
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(f1.x, f1.y); ctx.lineTo(f2.x, f2.y); ctx.stroke();
+      // 1m 基準線(赤の破線)
+      const m1 = worldToScreen(600, r.floorY - 1000), m2 = worldToScreen(r.right + 600, r.floorY - 1000);
+      ctx.strokeStyle = '#c62828';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([8, 5]);
+      ctx.beginPath(); ctx.moveTo(m1.x, m1.y); ctx.lineTo(m2.x, m2.y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#c62828';
+      ctx.font = `${fontPx(220)}px sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('1m', m2.x + wpx(100), m2.y);
+    }
+    for (const c of layout.cells) {
+      const g = c.g;
+      const over = g.over;
+      const line = over ? '#c62828' : '#333';
+      const fill = over ? 'rgba(255,205,210,0.5)' : 'rgba(250,250,250,0.9)';
+      // ラベル(品名 + 番号 + 台数)
+      const codes = g.numbers.map((n) => G.code(n)).join('');
+      const name = `${g.label}${codes}(${g.count}台)` + (over ? ' ⚠高さ1m超' : '');
+      const lp = worldToScreen(c.x, c.floorY - g.height - 250);
+      ctx.fillStyle = over ? '#c62828' : '#222';
+      ctx.font = `bold ${fontPx(260)}px sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(name, lp.x, lp.y);
+      // 正面図(幅 × 高さ) と 側面図(奥行 × 高さ)
+      const views = [
+        { x0: c.x, w: g.w, cap: '正面', dim: g.w },
+        { x0: c.x + g.w + 1500, w: g.h, cap: '側面', dim: g.h },
+      ];
+      for (const v of views) {
+        const tl = worldToScreen(v.x0, c.floorY - g.height);
+        const br = worldToScreen(v.x0 + v.w, c.floorY);
+        ctx.fillStyle = fill;
+        ctx.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        ctx.strokeStyle = line;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        // 下に「正面 幅0.60m」のように寸法を書く
+        ctx.fillStyle = '#1565c0';
+        ctx.font = `${fontPx(220)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const label = v.cap === '正面' ? `正面 幅${G.fmtM(v.dim)}m` : `側面 奥行${G.fmtM(v.dim)}m`;
+        ctx.fillText(label, (tl.x + br.x) / 2, br.y + wpx(150));
+      }
+      // 高さ寸法(側面図の右側に縦書き)
+      const hx = worldToScreen(c.x + g.w + 1500 + g.h + 400, c.floorY - g.height / 2);
+      ctx.save();
+      ctx.translate(hx.x, hx.y);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = over ? '#c62828' : '#1565c0';
+      ctx.font = `${fontPx(220)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`高さ${G.fmtM(g.height)}m`, 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   /* どのレイヤーで何を表示するか */
   function visibility(layer) {
     switch (layer) {
@@ -621,10 +837,24 @@
       case 'lighting':
         return { regionsFill: true, allRegions: true, regionTypes: null,
                  furniture: false, fittings: false, fixtures: true, dims: false, table: 'fixtures' };
+      case 'furnviews':
+        // 備品姿図: 間取りは描かず、備品の正面図・側面図だけを並べる
+        return { regionsFill: false, allRegions: false, regionTypes: [],
+                 furniture: false, fittings: false, fixtures: false, dims: false, table: 'furniture' };
       default:
         return { regionsFill: true, allRegions: true, regionTypes: null,
                  furniture: true, fittings: true, fixtures: true, dims: true, table: false };
     }
+  }
+
+  /* 求積図の線色(色分けモード時)。営業所=青・客室=赤・調理場=緑の慣行色。 */
+  function strokeFor(r, project) {
+    if (project.meta.colorMode !== 'police') return null;
+    if (currentLayer === 'kyakushitsu') {
+      if (r.type === 'kyakushitsu') return '#e53935';
+      if (r.type === 'chubo') return '#2e7d32';
+    }
+    return null;
   }
 
   function render(ctx, canvas, project, state) {
@@ -634,6 +864,20 @@
     drawGrid(ctx, canvas);
     if (project.meta.showPaperFrame) {
       drawPaperFrame(ctx, project);
+    }
+
+    // 備品姿図は間取りを描かず、姿図シートだけを描いて終わる
+    if (currentLayer === 'furnviews') {
+      drawFurnViews(ctx, canvas, project);
+      return;
+    }
+
+    // 営業所外周(壁)。平面図・営業所求積図でははっきり、その他では薄く描く
+    if (project.premise) {
+      drawPremiseWalls(ctx, project, {
+        muted: currentLayer !== 'plan' && currentLayer !== 'premises',
+        selected: state.selectedId === 'premise',
+      });
     }
 
     const regions = project.regions.filter((r) =>
@@ -648,6 +892,7 @@
         fill: vis.regionsFill,
         muted: !isMain(r),
         selected: state.selectedId === r.id,
+        stroke: strokeFor(r, project),
         code,
       });
     }
@@ -670,6 +915,10 @@
         drawFixture(ctx, x, { selected: state.selectedId === x.id });
       }
       drawFixtureLegend(ctx, canvas, project);
+    }
+    // 営業所求積図では壁芯線(求積の根拠になる線)を最前面側に描く
+    if (currentLayer === 'premises' && project.premise) {
+      drawPremiseCenterline(ctx, project);
     }
     // 多角形の作図中なら下書きを最前面に描く
     if (state.draft && state.draft.points) {

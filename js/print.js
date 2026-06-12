@@ -56,12 +56,61 @@
     }).join('');
   }
 
+  /* 壁芯外周の求積表(座標法)。画面の求積表と同じ内容をPDFにも載せる。 */
+  function premiseTableHtml(project) {
+    if (!project.premise) {
+      return '<table class="kyuseki"><caption>営業所求積表(壁芯)</caption>' +
+             '<tbody><tr><td>営業所外周が未作成です</td></tr></tbody></table>';
+    }
+    const c = global.Geometry.premiseCalc(project.premise);
+    const rows = c.rows.map((row) =>
+      `<tr><td>P${row.no}</td><td class="num">${row.x.toFixed(2)}</td><td class="num">${row.y.toFixed(2)}</td>
+       <td class="num">${row.dy.toFixed(2)}</td><td class="num">${row.prod.toFixed(4)}</td></tr>`).join('');
+    return `
+      <table class="kyuseki">
+        <caption>営業所求積表(壁芯・座標法)</caption>
+        <thead><tr><th>点</th><th>X(m)</th><th>Y(m)</th><th>Y次−Y前</th><th>X×(Y次−Y前)</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr><td colspan="4">倍面積</td><td class="num">${c.doubleArea.toFixed(4)}</td></tr>
+          <tr><td colspan="4">面積(倍面積÷2)</td><td class="num">${c.area4.toFixed(4)} ㎡</td></tr>
+          <tr><td colspan="4">営業所面積(壁芯)</td><td class="num">${c.total.toFixed(2)} ㎡</td></tr>
+        </tfoot>
+      </table>`;
+  }
+
+  /* 備品一覧表(備品姿図に添付) */
+  function furnTableHtml(project) {
+    const groups = global.Geometry.furnitureGroups(project);
+    let rows = groups.map((g) => {
+      const codes = g.numbers.map((n) => global.Geometry.code(n)).join('');
+      return `<tr><td>${escapeHtml(g.label)}${codes}</td><td class="num">${g.w}×${g.h}</td>
+        <td class="num">${g.height}</td><td class="num">${g.count}</td>
+        <td>${g.over ? '高さ1m超' : '—'}</td></tr>`;
+    }).join('');
+    if (!rows) rows = '<tr><td colspan="5">備品なし</td></tr>';
+    return `
+      <table class="kyuseki">
+        <caption>備品一覧表</caption>
+        <thead><tr><th>品名(番号)</th><th>幅×奥行(mm)</th><th>高さ(mm)</th><th>数量</th><th>備考</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
   /* レイヤーに応じた添付表のHTML */
   function tablesForLayer(project, layer) {
     const vis = global.Render.visibility(layer);
     if (vis.table === 'all') {
-      return tableHtml('営業所求積表', global.Geometry.buildTable(project, null)) +
-             coordTablesHtml(project, null);
+      // 営業所求積: 方式(区画合計/壁芯/両方)に応じて出し分ける
+      const method = project.meta.premisesMethod || 'regions';
+      const parts = [];
+      if (method !== 'regions') parts.push(premiseTableHtml(project));
+      if (method !== 'centerline') {
+        parts.push(tableHtml(
+          method === 'both' ? '営業所求積表(内法・区画合計)' : '営業所求積表',
+          global.Geometry.buildTable(project, null)) + coordTablesHtml(project, null));
+      }
+      return parts.join('');
     }
     if (vis.table === 'kyakuchubo') {
       return tableHtml('客室求積表', global.Geometry.buildTable(project, ['kyakushitsu'])) +
@@ -70,6 +119,9 @@
     }
     if (vis.table === 'fixtures') {
       return fixtureTableHtml(project);
+    }
+    if (vis.table === 'furniture') {
+      return furnTableHtml(project);
     }
     return '';
   }

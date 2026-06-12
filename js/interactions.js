@@ -59,6 +59,28 @@
     return Math.abs(lx) <= el.w / 2 && Math.abs(ly) <= el.h / 2;
   }
 
+  /* 点と線分の距離(mm)。営業所外周は「線の近く」だけつかめるようにする。 */
+  function distToSegment(wx, wy, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, ((wx - ax) * dx + (wy - ay) * dy) / len2)) : 0;
+    return Math.hypot(wx - (ax + dx * t), wy - (ay + dy * t));
+  }
+
+  /* 営業所外周の輪郭線の近く(壁厚 or 12px相当のどちらか大きい方)なら true。
+   * 内側全体を当たりにすると、店内の空きクリック(パン)を奪ってしまうため線だけにする。 */
+  function nearPremiseEdge(project, wx, wy) {
+    const pr = project.premise;
+    if (!pr || (pr.points || []).length < 3) return false;
+    const tol = Math.max(pr.wallThickness || 100, 12 / global.Render.view.zoom);
+    const pts = pr.points;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      if (distToSegment(wx, wy, pr.x + a.x, pr.y + a.y, pr.x + b.x, pr.y + b.y) <= tol) return true;
+    }
+    return false;
+  }
+
   function hitTest(project, wx, wy) {
     // 上に描かれるもの(設備→備品→区画)を優先
     for (let i = project.fixtures.length - 1; i >= 0; i--) {
@@ -79,6 +101,8 @@
       const hit = r.shape === 'polygon' ? inPolygon(wx, wy, r) : inRotatedRect(wx, wy, r);
       if (hit) return r;
     }
+    // 営業所外周は一番下(輪郭線の近くだけ)
+    if (nearPremiseEdge(project, wx, wy)) return project.premise;
     return null;
   }
 
@@ -103,11 +127,12 @@
       return { width: canvas._cssW || canvas.width, height: canvas._cssH || canvas.height };
     }
 
-    /* 選択中の多角形の頂点のうち、画面上で近い(8px以内)ものを探す */
+    /* 選択中の多角形(区画・営業所外周)の頂点のうち、画面上で近い(8px以内)ものを探す */
     function findVertexAt(p) {
       if (!state.selectedId) return null;
       const found = global.Model.findById(project, state.selectedId);
-      if (!found || found.kind !== 'regions' || found.element.shape !== 'polygon') return null;
+      if (!found || (found.kind !== 'regions' && found.kind !== 'premise') ||
+          found.element.shape !== 'polygon') return null;
       const r = found.element;
       for (let i = 0; i < r.points.length; i++) {
         const s = global.Render.worldToScreen(r.x + r.points[i].x, r.y + r.points[i].y);
@@ -119,6 +144,13 @@
     const onMouseDown = (e) => {
       const p = pos(e);
       const w = global.Render.screenToWorld(p.x, p.y);
+
+      // 備品姿図は一覧表示専用: パンとズームだけにする(隠れた要素を誤選択しない)
+      if (global.Render.getLayer() === 'furnviews' && !state.draft) {
+        mode = 'pan';
+        last = p;
+        return;
+      }
 
       // 多角形の作図中: クリックで頂点を置く。最初の点の近く(10px)なら閉じて確定。
       if (state.draft) {
