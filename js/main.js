@@ -252,12 +252,15 @@
     $('metaOrient').value = m.orientation;
     $('metaAuthor').value = m.author;
     $('fixNote').value = m.lightingNote || '';
+    $('metaFrame').checked = m.showPaperFrame !== false;
     $('metaStore').oninput = (e) => m.storeName = e.target.value;
     $('metaAddr').oninput  = (e) => m.address = e.target.value;
     $('metaAuthor').oninput= (e) => m.author = e.target.value;
-    $('metaScale').onchange = (e) => m.scale = parseInt(e.target.value, 10);
-    $('metaPaper').onchange = (e) => m.paper = e.target.value;
-    $('metaOrient').onchange= (e) => m.orientation = e.target.value;
+    // 縮尺・用紙・向きは用紙枠ガイドの大きさに効くので、変更したら再描画する
+    $('metaScale').onchange = (e) => { m.scale = parseInt(e.target.value, 10); draw(); };
+    $('metaPaper').onchange = (e) => { m.paper = e.target.value; draw(); };
+    $('metaOrient').onchange= (e) => { m.orientation = e.target.value; draw(); };
+    $('metaFrame').onchange = (e) => { m.showPaperFrame = e.target.checked; draw(); };
     // 設備図コメントは凡例に即時反映させるため、入力のたびに再描画する
     $('fixNote').oninput = (e) => { m.lightingNote = e.target.value; draw(); };
   }

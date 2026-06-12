@@ -84,6 +84,11 @@
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
 
+    /* render と同じ CSS px 基準のキャンバスサイズ(方位記号の当たり判定用) */
+    function cssCanvas() {
+      return { width: canvas._cssW || canvas.width, height: canvas._cssH || canvas.height };
+    }
+
     /* 選択中の多角形の頂点のうち、画面上で近い(8px以内)ものを探す */
     function findVertexAt(p) {
       if (!state.selectedId) return null;
@@ -114,6 +119,14 @@
         }
         pts.push({ x: snap(w.x), y: snap(w.y) });
         onChange();
+        return;
+      }
+
+      // 方位記号の先端(N)をつかんだら回転モード
+      const nm = global.Render.getNorthMark(cssCanvas(), project);
+      if (Math.hypot(p.x - nm.tip.x, p.y - nm.tip.y) <= 12) {
+        mode = 'north';
+        last = p;
         return;
       }
 
@@ -155,7 +168,13 @@
       }
       if (!mode) return;
       const p = p0;
-      if (mode === 'vertex' && dragTarget) {
+      if (mode === 'north') {
+        // 方位記号の中心から見たカーソルの向き = 北の向き(360度)
+        const nm = global.Render.getNorthMark(cssCanvas(), project);
+        const deg = Math.atan2(p.x - nm.cx, -(p.y - nm.cy)) * 180 / Math.PI;
+        project.meta.northAngle = Math.round((deg + 360) % 360);
+        onChange();
+      } else if (mode === 'vertex' && dragTarget) {
         // 頂点を動かして形を修正する(スナップあり・Shiftで自由)
         const w = global.Render.screenToWorld(p.x, p.y);
         let nx = w.x, ny = w.y;

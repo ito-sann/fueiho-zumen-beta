@@ -132,6 +132,8 @@ table.kyuseki tfoot td { font-weight: 700; background: #f1f5f9; }
 }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .modal-head h2 { font-size: 15px; margin: 0; }
+.check-row { display: block; font-size: 12px; color: #475569; margin: 8px 0 4px; }
+.check-row input { width: auto; margin-right: 6px; }
 .corp-toggle { display: block; font-size: 13px; margin: 10px 0; color: #1f2937; }
 .corp-toggle input { margin-right: 6px; }
 .check-progress { font-size: 13px; font-weight: 700; color: #2563eb; margin: 4px 0 8px; }

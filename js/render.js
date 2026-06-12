@@ -27,9 +27,16 @@
     return { x: (px - view.offsetX) / view.zoom, y: (py - view.offsetY) / view.zoom };
   }
 
-  /* 全要素が収まるようにビューを合わせる */
+  /* 全要素が収まるようにビューを合わせる(用紙枠の表示中は枠も含める) */
   function fitToView(project, canvas) {
-    const bb = global.Geometry.boundingBox(project);
+    let bb = global.Geometry.boundingBox(project);
+    if (project.meta.showPaperFrame) {
+      const f = paperFrameWorld(project);
+      const minX = Math.min(bb.x, f.x), minY = Math.min(bb.y, f.y);
+      const maxX = Math.max(bb.x + bb.w, f.x + f.w);
+      const maxY = Math.max(bb.y + bb.h, f.y + f.h);
+      bb = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+    }
     const margin = 60;
     const pad = Math.max(bb.w, bb.h) * 0.12 + 500;
     const w = bb.w + pad * 2, h = bb.h + pad * 2;
@@ -457,22 +464,95 @@
     ctx.restore();
   }
 
-  /* 方位記号(北マーク)を右上に描く */
-  function drawNorthMark(ctx, canvas) {
-    const cx = canvas.width - 40, cy = 46, r = 18;
+  /* 用紙枠(用紙サイズ×縮尺がカバーする実寸範囲)をワールド座標で返す。
+   * 例: A4横・1/50 → 297mm×50 = 14850mm ×、210mm×50 = 10500mm。原点は(0,0)。 */
+  function paperFrameWorld(project) {
+    const m = project.meta;
+    const p = global.Model.PAPER_SIZES[m.paper] || global.Model.PAPER_SIZES.A4;
+    const landscape = m.orientation !== 'portrait';
+    return {
+      x: 0, y: 0,
+      w: (landscape ? p.w : p.h) * m.scale,
+      h: (landscape ? p.h : p.w) * m.scale,
+    };
+  }
+
+  /* 用紙枠ガイドを描く。枠の右下に縮尺を自動表示する。 */
+  function drawPaperFrame(ctx, project) {
+    const f = paperFrameWorld(project);
+    const tl = worldToScreen(f.x, f.y);
+    const br = worldToScreen(f.x + f.w, f.y + f.h);
+    const m = project.meta;
+    ctx.save();
+    // 枠(青の破線)
+    ctx.strokeStyle = '#1d4ed8';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 6]);
+    ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    ctx.setLineDash([]);
+    // 左上: 用紙の説明
+    ctx.fillStyle = '#1d4ed8';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    const orient = m.orientation === 'portrait' ? '縦' : '横';
+    ctx.fillText(
+      `用紙枠 ${m.paper}${orient}(この枠内 = ${(f.w / 1000).toFixed(2)} × ${(f.h / 1000).toFixed(2)} m)`,
+      tl.x, tl.y - 4);
+    // 右下: 縮尺(枠に追従)
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`縮尺 1/${m.scale}`, br.x - 8, br.y - 6);
+    ctx.restore();
+  }
+
+  /* 方位記号の中心位置(画面px)。用紙枠の表示中は枠内右上に置き、
+   * 非表示なら従来どおり画面の右上に固定する。 */
+  function northMarkCenter(canvas, project) {
+    if (project.meta.showPaperFrame) {
+      const f = paperFrameWorld(project);
+      const s = worldToScreen(f.x + f.w, f.y);
+      return { x: s.x - 40, y: s.y + 48 };
+    }
+    return { x: canvas.width - 40, y: 46 };
+  }
+
+  /* 方位記号の形状(中心・半径・Nの先端位置)。当たり判定にも使う。 */
+  function getNorthMark(canvas, project) {
+    const c = northMarkCenter(canvas, project);
+    const r = 18;
+    const a = (project.meta.northAngle || 0) * Math.PI / 180;
+    // 角度0で真上。先端は円の外側(r+10)あたり。
+    const tip = { x: c.x + Math.sin(a) * (r + 10), y: c.y - Math.cos(a) * (r + 10) };
+    return { cx: c.x, cy: c.y, r, tip, angle: a };
+  }
+
+  /* 方位記号(北マーク)。Nの先端をドラッグすると360度回転できる。 */
+  function drawNorthMark(ctx, canvas, project) {
+    const n = getNorthMark(canvas, project);
+    const { cx, cy, r } = n;
     ctx.save();
     ctx.strokeStyle = '#333'; ctx.fillStyle = '#333'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    // 矢印(角度に追従して回転)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(n.angle);
     ctx.beginPath();
-    ctx.moveTo(cx, cy - r - 6);
-    ctx.lineTo(cx - 6, cy + 4);
-    ctx.lineTo(cx, cy - 2);
-    ctx.lineTo(cx + 6, cy + 4);
+    ctx.moveTo(0, -r - 6);
+    ctx.lineTo(-6, 4);
+    ctx.lineTo(0, -2);
+    ctx.lineTo(6, 4);
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
+    // N の文字は先端の少し外側(文字自体は回転させず読みやすく)
+    const lx = cx + Math.sin(n.angle) * (r + 16);
+    const ly = cy - Math.cos(n.angle) * (r + 16);
     ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('N', cx, cy - r - 14);
+    ctx.fillText('N', lx, ly);
     ctx.restore();
   }
 
@@ -501,6 +581,9 @@
     const vis = visibility(currentLayer);
     clear(ctx, canvas);
     drawGrid(ctx, canvas);
+    if (project.meta.showPaperFrame) {
+      drawPaperFrame(ctx, project);
+    }
 
     const regions = project.regions.filter((r) =>
       vis.allRegions || (vis.regionTypes && vis.regionTypes.indexOf(r.type) >= 0));
@@ -532,11 +615,12 @@
     if (state.draft && state.draft.points) {
       drawDraft(ctx, state.draft);
     }
-    drawNorthMark(ctx, canvas);
+    drawNorthMark(ctx, canvas, project);
   }
 
   global.Render = {
     view, LAYERS, setLayer, getLayer, visibility,
     worldToScreen, screenToWorld, fitToView, render,
+    paperFrameWorld, getNorthMark,
   };
 })(window);
