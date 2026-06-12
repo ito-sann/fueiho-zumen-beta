@@ -94,10 +94,21 @@ table.summary td { text-align: right; font-weight: 700; padding: 4px 2px; }
 .props .prop-row b { color: #1f2937; }
 .props .btn { margin-top: 8px; width: 100%; }
 
-/* 文字サイズの −/＋/自動 コントロール */
-.font-ctrl { display: flex; gap: 4px; flex: 1; align-items: center; }
-.font-ctrl input { width: 56px; min-width: 0; flex: 1; text-align: right; }
-.font-ctrl .btn { padding: 4px 8px; flex: 0 0 auto; }
+/* 文字サイズの −/＋/標準 コントロール(Googleドキュメント風)。
+ * .prop-row span の幅90px固定に負けないよう詳細度を上げる。 */
+.props .prop-row span.font-ctrl {
+  flex: 1 1 auto; display: flex; gap: 3px; align-items: stretch;
+}
+.font-ctrl input {
+  flex: 1 1 48px; min-width: 44px; margin-top: 0; padding: 4px 6px;
+  height: 26px; text-align: center; font-size: 13px; font-weight: 600;
+}
+.font-ctrl .btn {
+  flex: 0 0 26px; width: 26px; height: 26px; padding: 0;
+  font-size: 14px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.font-ctrl .btn:last-child { flex: 0 0 auto; width: auto; padding: 0 8px; font-size: 11px; }
 
 /* 多角形の頂点編集(P1: X / Y を横並びで) */
 .props .vertex-row { gap: 4px; }
