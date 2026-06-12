@@ -499,11 +499,30 @@
     ctx.fillText(
       `用紙枠 ${m.paper}${orient}(この枠内 = ${(f.w / 1000).toFixed(2)} × ${(f.h / 1000).toFixed(2)} m)`,
       tl.x, tl.y - 4);
-    // 右下: 縮尺(枠に追従)
-    ctx.font = 'bold 13px sans-serif';
+    // 右下: スケールバー(黒線の長さ = 図面上の1m)と縮尺表示
+    const barLen = 1000 * view.zoom; // 1m分の画面上の長さ
+    const bx2 = br.x - 12, bx1 = bx2 - barLen;
+    const by = br.y - 26; // 下のラベルが枠線にかからない高さ
+    ctx.strokeStyle = '#111';
+    ctx.fillStyle = '#111';
+    ctx.lineWidth = 2;
+    // 本体の線
+    ctx.beginPath(); ctx.moveTo(bx1, by); ctx.lineTo(bx2, by); ctx.stroke();
+    // 両端の目盛(縦線)と中央(0.5m)の小さい目盛
+    ctx.beginPath();
+    ctx.moveTo(bx1, by - 6); ctx.lineTo(bx1, by + 6);
+    ctx.moveTo(bx2, by - 6); ctx.lineTo(bx2, by + 6);
+    ctx.moveTo((bx1 + bx2) / 2, by - 3); ctx.lineTo((bx1 + bx2) / 2, by + 3);
+    ctx.stroke();
+    // ラベル: 線の両端に 0 / 1m、上に縮尺
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('0', bx1, by + 8);
+    ctx.fillText('1m', bx2, by + 8);
     ctx.textAlign = 'right';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`縮尺 1/${m.scale}`, br.x - 8, br.y - 6);
+    ctx.fillText(`縮尺 1/${m.scale}`, bx2, by - 8);
     ctx.restore();
   }
 
