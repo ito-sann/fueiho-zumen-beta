@@ -384,13 +384,76 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(sym, p.x, p.y);
-    // ラベル
-    ctx.fillStyle = '#555';
-    ctx.font = '10px sans-serif';
-    ctx.textBaseline = 'top';
-    let lab = x.label;
-    if (x.watt) lab += ' ' + x.watt + 'W';
-    ctx.fillText(lab, p.x, p.y + r + 1);
+    // 名称は図面下部の凡例にまとめるため、アイコンには記号だけを表示する
+    ctx.restore();
+  }
+
+  /* 凡例(図面右下): 使われている設備の記号・名称・台数・W数と、
+   * 自由記入のコメント(meta.lightingNote)をまとめて表示する。 */
+  function drawFixtureLegend(ctx, canvas, project) {
+    const list = global.Geometry.fixtureSummary(project);
+    const note = (project.meta.lightingNote || '').trim();
+    if (!list.length && !note) return;
+
+    const rows = list.map((g) =>
+      `${g.label} ${g.count}台${g.watt ? `(${g.watt}W)` : ''}`);
+    const noteLines = note ? note.split('\n') : [];
+    const title = '凡例(照明・音響設備)';
+    const lineH = 17, pad = 9, iconW = 22;
+
+    ctx.save();
+    ctx.font = '11px sans-serif';
+    let wMax = ctx.measureText(title).width;
+    for (const t of rows) wMax = Math.max(wMax, iconW + ctx.measureText(t).width);
+    for (const t of noteLines) wMax = Math.max(wMax, ctx.measureText(t).width);
+    const w = wMax + pad * 2;
+    const lines = 1 + rows.length + noteLines.length;
+    const h = pad * 2 + lineH * lines;
+    const x0 = canvas.width - w - 12;
+    const y0 = canvas.height - h - 12;
+
+    // 枠
+    ctx.fillStyle = 'rgba(255,255,255,0.93)';
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.fillRect(x0, y0, w, h);
+    ctx.strokeRect(x0, y0, w, h);
+
+    // タイトル
+    ctx.fillStyle = '#222';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    let y = y0 + pad + lineH / 2;
+    ctx.fillText(title, x0 + pad, y);
+
+    // 設備の行(アイコン + 名称・台数)
+    ctx.font = '11px sans-serif';
+    for (let i = 0; i < list.length; i++) {
+      y += lineH;
+      const cx = x0 + pad + 7, cy = y;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff8e1';
+      ctx.fill();
+      ctx.strokeStyle = '#f9a825';
+      ctx.stroke();
+      ctx.fillStyle = '#5d4037';
+      ctx.font = 'bold 7px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(list[i].symbol, cx, cy);
+      ctx.fillStyle = '#222';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(rows[i], x0 + pad + iconW, y);
+    }
+
+    // 自由記入のコメント
+    ctx.fillStyle = '#444';
+    for (const t of noteLines) {
+      y += lineH;
+      ctx.fillText(t, x0 + pad, y);
+    }
     ctx.restore();
   }
 
@@ -463,6 +526,7 @@
       for (const x of project.fixtures) {
         drawFixture(ctx, x, { selected: state.selectedId === x.id });
       }
+      drawFixtureLegend(ctx, canvas, project);
     }
     // 多角形の作図中なら下書きを最前面に描く
     if (state.draft && state.draft.points) {

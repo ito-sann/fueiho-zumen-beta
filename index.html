@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.3.0">
+  <link rel="stylesheet" href="css/style.css?v=1.3.2">
 </head>
 <body>
   <header class="topbar">
@@ -76,6 +76,10 @@
           <select id="fixKind"></select>
           <button id="btnAddFix" class="btn small">追加</button>
         </div>
+        <label class="field">設備図コメント(凡例の下に印字)
+          <textarea id="fixNote" rows="3" placeholder="例: ダウンライトは調光器なし&#10;営業中は全灯点灯"></textarea>
+        </label>
+        <p class="muted">記号と台数の凡例は図面右下に自動表示されます。</p>
       </section>
 
       <section class="group">
@@ -158,12 +162,12 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.3.0"></script>
-  <script src="js/geometry.js?v=1.3.0"></script>
-  <script src="js/render.js?v=1.3.0"></script>
-  <script src="js/interactions.js?v=1.3.0"></script>
-  <script src="js/print.js?v=1.3.0"></script>
-  <script src="js/forms.js?v=1.3.0"></script>
-  <script src="js/main.js?v=1.3.0"></script>
+  <script src="js/model.js?v=1.3.2"></script>
+  <script src="js/geometry.js?v=1.3.2"></script>
+  <script src="js/render.js?v=1.3.2"></script>
+  <script src="js/interactions.js?v=1.3.2"></script>
+  <script src="js/print.js?v=1.3.2"></script>
+  <script src="js/forms.js?v=1.3.2"></script>
+  <script src="js/main.js?v=1.3.2"></script>
 </body>
 </html>

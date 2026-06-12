@@ -36,14 +36,21 @@
     pillar:   { label: '柱',     w: 300,  h: 300 },
   };
 
-  /* 照明・音響設備カタログ(点で配置) */
+  /* 照明・音響設備カタログ(点で配置)。symbol は図面上の記号(重複不可)。 */
   const FIXTURE_CATALOG = {
-    downlight:   { label: 'ダウンライト', symbol: 'DL' },
-    fluorescent: { label: '蛍光灯',       symbol: 'FL' },
-    spotlight:   { label: 'スポットライト', symbol: 'SP' },
-    speaker:     { label: 'スピーカー',   symbol: 'SPK' },
-    monitor:     { label: 'モニター',     symbol: 'MON' },
-    karaoke:     { label: 'カラオケ',     symbol: 'KAR' },
+    downlight:   { label: 'ダウンライト',     symbol: 'DL' },
+    pendant:     { label: 'ペンダントライト', symbol: 'PL' },
+    ceiling:     { label: 'シーリングライト', symbol: 'CL' },
+    spotlight:   { label: 'スポットライト',   symbol: 'SP' },
+    floorstand:  { label: 'フロアスタンド',   symbol: 'FS' },
+    footlight:   { label: 'フットライト',     symbol: 'FT' },
+    chandelier:  { label: 'シャンデリア',     symbol: 'CH' },
+    tablelight:  { label: 'テーブルライト',   symbol: 'TL' },
+    bracket:     { label: 'ブラケット',       symbol: 'BR' },
+    fluorescent: { label: '蛍光灯',           symbol: 'FL' },
+    speaker:     { label: 'スピーカー',       symbol: 'SPK' },
+    monitor:     { label: 'モニター',         symbol: 'MON' },
+    karaoke:     { label: 'カラオケ',         symbol: 'KAR' },
   };
 
   /* 用紙サイズ(mm) */
@@ -93,6 +100,7 @@
         orientation: 'landscape',
         date: todayStr(),
         author: '',
+        lightingNote: '', // 照明・音響設備図の凡例に添える自由記入コメント
       },
       regions: [],
       furniture: [],

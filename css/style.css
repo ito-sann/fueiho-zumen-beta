@@ -63,10 +63,11 @@ body {
 .add-row select { flex: 1; }
 .size-row { display: flex; gap: 8px; }
 .size-row label, .field { font-size: 12px; color: #475569; display: block; margin-bottom: 6px; flex: 1; }
-.field input, .size-row input, .size-row select, select, input[type=text], input[type=number] {
+.field input, .size-row input, .size-row select, select, input[type=text], input[type=number], textarea {
   width: 100%; padding: 5px 7px; border: 1px solid #cbd5e1; border-radius: 5px;
   font-size: 13px; margin-top: 2px;
 }
+textarea { resize: vertical; font-family: inherit; }
 select, .btn.small { margin-top: 0; }
 
 /* ---- キャンバス ---- */

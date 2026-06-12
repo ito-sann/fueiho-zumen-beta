@@ -251,12 +251,15 @@
     $('metaPaper').value = m.paper;
     $('metaOrient').value = m.orientation;
     $('metaAuthor').value = m.author;
+    $('fixNote').value = m.lightingNote || '';
     $('metaStore').oninput = (e) => m.storeName = e.target.value;
     $('metaAddr').oninput  = (e) => m.address = e.target.value;
     $('metaAuthor').oninput= (e) => m.author = e.target.value;
     $('metaScale').onchange = (e) => m.scale = parseInt(e.target.value, 10);
     $('metaPaper').onchange = (e) => m.paper = e.target.value;
     $('metaOrient').onchange= (e) => m.orientation = e.target.value;
+    // 設備図コメントは凡例に即時反映させるため、入力のたびに再描画する
+    $('fixNote').oninput = (e) => { m.lightingNote = e.target.value; draw(); };
   }
 
   /* ---- 描画と再計算 ---- */

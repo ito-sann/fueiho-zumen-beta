@@ -81,10 +81,13 @@
     const m = project.meta;
     const sum = global.Geometry.summary(project);
 
-    // 照明設備(ダウンライト・蛍光灯・スポットライト)の概要
-    const lighting = fixtureSummaryText(project, ['downlight', 'fluorescent', 'spotlight']);
-    // 音響設備(スピーカー・モニター・カラオケ)の概要
-    const sound = fixtureSummaryText(project, ['speaker', 'monitor', 'karaoke']);
+    // 音響設備(スピーカー・モニター・カラオケ)とそれ以外(=照明)に分けて集計する。
+    // 照明はカタログから自動で拾うので、種類を追加してもここの修正は不要。
+    const soundKinds = ['speaker', 'monitor', 'karaoke'];
+    const lightKinds = Object.keys(global.Model.FIXTURE_CATALOG)
+      .filter((k) => soundKinds.indexOf(k) < 0);
+    const lighting = fixtureSummaryText(project, lightKinds);
+    const sound = fixtureSummaryText(project, soundKinds);
 
     return `
 <section class="page">
