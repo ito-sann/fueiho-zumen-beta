@@ -677,13 +677,11 @@
     ctx.save();
     ctx.strokeStyle = police ? '#1d4ed8' : '#111';
     ctx.lineWidth = 2.5;
-    ctx.setLineDash([wpx(450), wpx(140), wpx(70), wpx(140)]); // 一点鎖線
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.closePath();
     ctx.stroke();
-    ctx.setLineDash([]);
     ctx.restore();
     drawPolygonDims(ctx, rl); // 辺長(m)と P1, P2 … を共通処理で付ける
     // 凡例的なラベル
