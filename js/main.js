@@ -138,6 +138,48 @@
     $('btnLoad').onclick = () => $('fileInput').click();
     $('fileInput').onchange = loadFile;
     $('btnPdf').onclick = () => { draw(); P.printCurrent(project, canvas); };
+    $('btnPdfAll').onclick = () => { P.printAll(project); draw(); };
+    $('btnForms').onclick = () => global.Forms.openForms(project);
+    $('btnChecklist').onclick = openChecklist;
+    $('btnChecklistClose').onclick = closeChecklist;
+    $('checklistModal').onclick = (e) => {
+      if (e.target.id === 'checklistModal') closeChecklist(); // 背景クリックで閉じる
+    };
+    $('checkCorp').onchange = (e) => {
+      project.checklist.corp = e.target.checked;
+      renderChecklist();
+    };
+  }
+
+  /* ---- 必要書類チェックリスト ---- */
+  function openChecklist() {
+    $('checkCorp').checked = !!project.checklist.corp;
+    renderChecklist();
+    $('checklistModal').hidden = false;
+  }
+  function closeChecklist() {
+    $('checklistModal').hidden = true;
+  }
+  function renderChecklist() {
+    const cl = project.checklist;
+    const items = M.CHECKLIST_ITEMS.filter((it) => !it.corpOnly || cl.corp);
+    const done = items.filter((it) => cl.items[it.id]).length;
+    let html = `<p class="check-progress">${done} / ${items.length} 件 そろっています</p><ul class="checklist">`;
+    for (const it of items) {
+      const checked = cl.items[it.id] ? ' checked' : '';
+      const corp = it.corpOnly ? '<span class="badge">法人</span>' : '';
+      const note = it.note ? `<span class="muted">(${esc(it.note)})</span>` : '';
+      html += `<li><label><input type="checkbox" data-check="${it.id}"${checked}> ${esc(it.label)} ${corp} ${note}</label></li>`;
+    }
+    html += '</ul>';
+    const box = $('checklistBody');
+    box.innerHTML = html;
+    box.querySelectorAll('[data-check]').forEach((inp) => {
+      inp.onchange = (e) => {
+        cl.items[e.target.dataset.check] = e.target.checked;
+        renderChecklist(); // 進捗表示を更新
+      };
+    });
   }
 
   function clampSize(v) {
@@ -211,15 +253,11 @@
       <tr><th>その他面積</th><td>${s.other.toFixed(2)} ㎡</td></tr>`;
   }
 
-  function renderKyuseki() {
-    const layer = R.getLayer();
-    let types = null, title = '営業所求積表';
-    if (layer === 'kyakushitsu') { types = ['kyakushitsu']; title = '客室求積表'; }
-    const t = G.buildTable(project, types);
+  function kyusekiTableHtml(title, t) {
     let rows = t.rows.map((r) =>
       `<tr><td>${r.code}</td><td>${esc(r.label)}</td><td>${r.expr}</td><td>${r.area.toFixed(4)}</td></tr>`).join('');
     if (!rows) rows = '<tr><td colspan="4" class="muted">区画がありません</td></tr>';
-    $('kyusekiBox').innerHTML = `
+    return `
       <div class="kyuseki-title">${title}</div>
       <table class="kyuseki">
         <thead><tr><th>符号</th><th>区画</th><th>計算式</th><th>面積(㎡)</th></tr></thead>
@@ -228,16 +266,75 @@
       </table>`;
   }
 
-  function renderWarnings() {
-    const w = G.sightlineWarnings(project);
-    const box = $('warnBox');
-    if (!w.length) {
-      box.innerHTML = '<p class="ok">高さ1mを超える設備はありません。</p>';
-      return;
+  /* 照明・音響設備一覧表(設備図に添える) */
+  function fixtureTableHtml() {
+    const list = G.fixtureSummary(project);
+    let rows = list.map((g) =>
+      `<tr><td>${esc(g.symbol)}</td><td>${esc(g.label)}</td><td>${g.count}</td><td>${esc(g.watt || '—')}</td></tr>`).join('');
+    if (!rows) rows = '<tr><td colspan="4" class="muted">設備がありません</td></tr>';
+    return `
+      <div class="kyuseki-title">照明・音響設備一覧表</div>
+      <table class="kyuseki">
+        <thead><tr><th>記号</th><th>設備</th><th>数量</th><th>W数</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  function renderKyuseki() {
+    const layer = R.getLayer();
+    let html;
+    if (layer === 'kyakushitsu') {
+      // 客室・調理場求積図: 客室と調理場の求積表を別々に出す
+      html = kyusekiTableHtml('客室求積表', G.buildTable(project, ['kyakushitsu'])) +
+             kyusekiTableHtml('調理場求積表', G.buildTable(project, ['chubo']));
+    } else if (layer === 'lighting') {
+      html = fixtureTableHtml();
+    } else {
+      html = kyusekiTableHtml('営業所求積表', G.buildTable(project, null));
     }
-    box.innerHTML = '<p class="ng">客室の見通しを妨げるおそれ(高さ1m超):</p><ul>' +
-      w.map((x) => `<li>${esc(x.label)}(${(x.height / 1000).toFixed(2)}m)</li>`).join('') +
-      '</ul><p class="muted">深夜酒類では客室を見通せる必要があります。配置・高さを確認してください。</p>';
+    $('kyusekiBox').innerHTML = html;
+  }
+
+  function renderWarnings() {
+    const box = $('warnBox');
+    let html = '';
+
+    // 1) 見通し規制(高さ概ね1m以上の設備)
+    const w = G.sightlineWarnings(project);
+    if (w.length) {
+      html += '<p class="ng">客室の見通しを妨げるおそれ(高さ1m超):</p><ul>' +
+        w.map((x) => `<li>${esc(x.label)}(${(x.height / 1000).toFixed(2)}m)</li>`).join('') +
+        '</ul>';
+    } else {
+      html += '<p class="ok">見通し: 高さ1mを超える設備はありません。</p>';
+    }
+
+    // 2) 客室の床面積要件(2室以上のとき各室9.5㎡以上)
+    const rooms = project.regions.filter((r) => r.type === 'kyakushitsu');
+    const small = G.kyakushitsuSizeWarnings(project);
+    if (small.length) {
+      html += `<p class="ng">客室が2室以上の場合、1室 ${G.KYAKUSHITSU_MIN_SQM}㎡ 以上が必要です:</p><ul>` +
+        small.map((x) => `<li>${esc(x.label)}(${x.area.toFixed(4)}㎡)</li>`).join('') +
+        '</ul>';
+    } else if (rooms.length >= 2) {
+      html += `<p class="ok">客室面積: 全室 ${G.KYAKUSHITSU_MIN_SQM}㎡ 以上を満たしています。</p>`;
+    } else if (rooms.length === 1) {
+      html += '<p class="ok">客室面積: 客室1室のみのため面積の下限はありません。</p>';
+    }
+
+    // 3) 構造・設備の固定リマインダー(図面からは判定できない要件)
+    html += `
+      <details class="reminder">
+        <summary>構造・設備の要件メモ(クリックで開く)</summary>
+        <ul class="muted-list">
+          <li>客室の出入口に施錠設備を設けない(外部に直接面する出入口を除く)</li>
+          <li>営業所内の照度を20ルクス以下としない(調光器(スライダック)は不可)</li>
+          <li>騒音・振動は条例の数値基準に適合させる</li>
+          <li>善良の風俗を害するおそれのある写真・装飾等を設けない</li>
+        </ul>
+      </details>`;
+
+    box.innerHTML = html;
   }
 
   /* ---- プロパティ編集 ---- */

@@ -8,11 +8,11 @@
   /* ビュー(パン・ズーム)。zoom = px/mm */
   const view = { zoom: 0.05, offsetX: 40, offsetY: 40 };
 
-  /* レイヤー(図面の種類) */
+  /* レイヤー(図面の種類)。届出に添付する図面の単位と一致させている。 */
   const LAYERS = {
     plan:      { label: '平面図' },
     premises:  { label: '営業所求積図' },
-    kyakushitsu: { label: '客室求積図' },
+    kyakushitsu: { label: '客室・調理場求積図' },
     lighting:  { label: '照明・音響設備図' },
   };
   let currentLayer = 'plan';
@@ -318,11 +318,11 @@
         return { regionsFill: false, allRegions: true, regionTypes: null,
                  furniture: false, fittings: false, fixtures: false, dims: true, table: 'all' };
       case 'kyakushitsu':
-        return { regionsFill: true, allRegions: false, regionTypes: ['kyakushitsu'],
-                 furniture: false, fittings: false, fixtures: false, dims: true, table: 'kyakushitsu' };
+        return { regionsFill: true, allRegions: false, regionTypes: ['kyakushitsu', 'chubo'],
+                 furniture: false, fittings: false, fixtures: false, dims: true, table: 'kyakuchubo' };
       case 'lighting':
         return { regionsFill: true, allRegions: true, regionTypes: null,
-                 furniture: false, fittings: false, fixtures: true, dims: false, table: false };
+                 furniture: false, fittings: false, fixtures: true, dims: false, table: 'fixtures' };
       default:
         return { regionsFill: true, allRegions: true, regionTypes: null,
                  furniture: true, fittings: true, fixtures: true, dims: true, table: false };

@@ -103,12 +103,45 @@
     };
   }
 
-  /* 見通し規制(高さ1m超)に触れる備品の一覧 */
+  /* 見通し規制(高さ概ね1m以上)に触れる備品の一覧 */
   function sightlineWarnings(project) {
     const limit = global.Model.SIGHTLINE_LIMIT;
     return project.furniture
       .filter((f) => typeof f.height === 'number' && f.height > limit)
       .map((f) => ({ id: f.id, label: f.label, height: f.height }));
+  }
+
+  /* 客室の床面積要件(風営法施行規則):
+   *   客室が2室以上ある場合、1室の床面積は 9.5㎡ 以上が必要。
+   *   客室が1室のみの場合はこの制限はない。
+   * 9.5㎡ 未満の客室の一覧を返す(1室のみなら常に空)。 */
+  const KYAKUSHITSU_MIN_SQM = 9.5;
+  function kyakushitsuSizeWarnings(project) {
+    const rooms = project.regions.filter((r) => r.type === 'kyakushitsu');
+    if (rooms.length <= 1) return [];
+    return rooms
+      .map((r) => ({ id: r.id, label: r.label, area: regionAreaSqm(r) }))
+      .filter((x) => x.area < KYAKUSHITSU_MIN_SQM);
+  }
+
+  /* 照明・音響設備の一覧表(種類ごとに数量・ワット数を集計)。
+   * 照明・音響設備図に添える「設備一覧表」のデータになる。 */
+  function fixtureSummary(project) {
+    const cat = global.Model.FIXTURE_CATALOG;
+    const map = new Map();
+    for (const x of project.fixtures) {
+      if (!map.has(x.kind)) {
+        const c = cat[x.kind] || {};
+        map.set(x.kind, { kind: x.kind, label: c.label || x.label, symbol: c.symbol || '?', count: 0, watts: new Set() });
+      }
+      const g = map.get(x.kind);
+      g.count++;
+      if (x.watt) g.watts.add(String(x.watt));
+    }
+    return Array.from(map.values()).map((g) => ({
+      kind: g.kind, label: g.label, symbol: g.symbol, count: g.count,
+      watt: Array.from(g.watts).join(', '),
+    }));
   }
 
   /* 全要素のバウンディングボックス(mm)。空なら既定値。 */
@@ -138,6 +171,7 @@
 
   global.Geometry = {
     mmToM, fmtM, code, regionCalc, regionAreaSqm, regionRow, buildTable,
-    summary, sightlineWarnings, boundingBox,
+    summary, sightlineWarnings, kyakushitsuSizeWarnings, KYAKUSHITSU_MIN_SQM,
+    fixtureSummary, boundingBox,
   };
 })(window);

@@ -8,16 +8,19 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.1.0">
+  <link rel="stylesheet" href="css/style.css?v=1.2.0">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">深夜酒類 図面エディタ<span class="tag">届出用 平面図 / 求積図</span></div>
     <div class="layer-tabs" id="layerTabs"></div>
     <div class="top-actions">
+      <button id="btnChecklist" class="btn">必要書類</button>
+      <button id="btnForms" class="btn">届出書作成</button>
       <button id="btnSave"  class="btn">保存</button>
       <button id="btnLoad"  class="btn">読み込み</button>
-      <button id="btnPdf"   class="btn primary">PDF出力</button>
+      <button id="btnPdf"   class="btn primary">この図面をPDF</button>
+      <button id="btnPdfAll" class="btn primary">図面一式PDF</button>
       <input type="file" id="fileInput" accept="application/json" hidden>
     </div>
   </header>
@@ -139,11 +142,26 @@
     </aside>
   </main>
 
-  <script src="js/model.js?v=1.1.0"></script>
-  <script src="js/geometry.js?v=1.1.0"></script>
-  <script src="js/render.js?v=1.1.0"></script>
-  <script src="js/interactions.js?v=1.1.0"></script>
-  <script src="js/print.js?v=1.1.0"></script>
-  <script src="js/main.js?v=1.1.0"></script>
+  <!-- 必要書類チェックリスト(モーダル) -->
+  <div id="checklistModal" class="modal-back" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>必要書類チェックリスト(深夜酒類提供飲食店営業開始届出)</h2>
+        <button id="btnChecklistClose" class="btn small">閉じる</button>
+      </div>
+      <p class="muted">提出先: 営業所の所在地を管轄する警察署(公安委員会宛て) / 期限: 営業開始の<b>10日前まで</b><br>
+        必要書類は都道府県警・所轄署により異なります。必ず最新の案内を確認してください。</p>
+      <label class="corp-toggle"><input type="checkbox" id="checkCorp"> 届出者は法人(法人書類を表示)</label>
+      <div id="checklistBody"></div>
+    </div>
+  </div>
+
+  <script src="js/model.js?v=1.2.0"></script>
+  <script src="js/geometry.js?v=1.2.0"></script>
+  <script src="js/render.js?v=1.2.0"></script>
+  <script src="js/interactions.js?v=1.2.0"></script>
+  <script src="js/print.js?v=1.2.0"></script>
+  <script src="js/forms.js?v=1.2.0"></script>
+  <script src="js/main.js?v=1.2.0"></script>
 </body>
 </html>

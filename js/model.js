@@ -55,6 +55,28 @@
   /* 見通しを妨げるおそれがあると判定する高さのしきい値(mm) = 1m */
   const SIGHTLINE_LIMIT = 1000;
 
+  /* 深夜酒類提供飲食店営業開始届出の必要書類チェックリスト。
+   * corpOnly: 法人の場合のみ必要。 note: 補足。
+   * 提出先: 営業所所在地を管轄する警察署(公安委員会宛て)。
+   * 期限: 営業開始の10日前まで。詳細は都道府県警により異なる。 */
+  const CHECKLIST_ITEMS = [
+    { id: 'todokede',  label: '営業開始届出書(様式第47号)' },
+    { id: 'houhou',    label: '営業の方法(様式第48号)' },
+    { id: 'annaizu',   label: '営業所周辺の略図(案内図)', note: '住宅地図の写し等。本ツール対象外' },
+    { id: 'heimenzu',  label: '営業所平面図' },
+    { id: 'kyuseki_e', label: '営業所求積図・求積表' },
+    { id: 'kyuseki_k', label: '客室・調理場求積図・求積表' },
+    { id: 'shomei',    label: '照明・音響設備図(設備一覧表つき)' },
+    { id: 'juminhyo',  label: '住民票の写し(本籍記載・マイナンバーなし)' },
+    { id: 'teikan',    label: '定款の写し', corpOnly: true },
+    { id: 'tokibo',    label: '登記事項証明書', corpOnly: true },
+    { id: 'yakuin',    label: '役員全員の住民票の写し', corpOnly: true },
+    { id: 'kyoka',     label: '飲食店営業許可証の写し', note: '署により' },
+    { id: 'chintai',   label: '賃貸借契約書の写し・使用承諾書等', note: '署により' },
+    { id: 'menu',      label: 'メニュー表の写し', note: '署により' },
+    { id: 'ininjo',    label: '委任状', note: '行政書士が代理提出する場合' },
+  ];
+
   function todayStr() {
     const d = new Date();
     const p = (n) => String(n).padStart(2, '0');
@@ -76,6 +98,8 @@
       furniture: [],
       fittings: [],
       fixtures: [],
+      /* 必要書類チェックリストの状態。corp=法人かどうか, items={id: true} */
+      checklist: { corp: false, items: {} },
       _seq: 1,
     };
   }
@@ -195,6 +219,8 @@
     project.furniture = obj.furniture || [];
     project.fittings = obj.fittings || [];
     project.fixtures = obj.fixtures || [];
+    project.checklist = Object.assign({ corp: false, items: {} }, obj.checklist || {});
+    project.checklist.items = (obj.checklist && obj.checklist.items) || {};
     if (typeof project._seq !== 'number') {
       project._seq = 1 + project.regions.length + project.furniture.length +
                      project.fittings.length + project.fixtures.length;
@@ -204,7 +230,7 @@
 
   global.Model = {
     REGION_TYPES, FURNITURE_CATALOG, FITTING_CATALOG, FIXTURE_CATALOG, PAPER_SIZES,
-    SIGHTLINE_LIMIT,
+    SIGHTLINE_LIMIT, CHECKLIST_ITEMS,
     todayStr, defaultProject, nextId, nextRegionNumber,
     addRegion, addFurniture, addFitting, addFixture, removeById, findById,
     serialize, deserialize,
