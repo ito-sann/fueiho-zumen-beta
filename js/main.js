@@ -13,22 +13,54 @@
   const canvas = $('canvas');
   const ctx = canvas.getContext('2d');
 
+  /* ---- 自動保存(localStorage) ----
+   * 変更のたびに少し待ってからブラウザ内へ保存し、次回開いたとき自動復元する。
+   * ファイルの「保存」ボタンとは別物(こちらはこのブラウザ限りの控え)。 */
+  const AUTOSAVE_KEY = 'shinya-zumen-autosave';
+  let autosaveTimer = null;
+  function saveAutosave() {
+    try {
+      localStorage.setItem(AUTOSAVE_KEY, M.serialize(project));
+    } catch (e) { /* プライベートモードや容量超過では保存できないが、操作は止めない */ }
+  }
+  function scheduleAutosave() {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(saveAutosave, 800);
+  }
+  function loadAutosave() {
+    try {
+      const text = localStorage.getItem(AUTOSAVE_KEY);
+      return text ? M.deserialize(text) : null;
+    } catch (e) { return null; } // 壊れた控えは無視してサンプルから始める
+  }
+  function clearAutosave() {
+    try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) { /* 何もしない */ }
+  }
+
   /* ---- 初期化 ---- */
   function init() {
+    // 前回の続き(自動保存)があれば復元する
+    const saved = loadAutosave();
+    if (saved) project = saved;
+
     buildSelects();
     buildLayerTabs();
     bindToolbar();
     bindMeta();
     resizeCanvas();
     window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+    // タブを閉じる・リロードする瞬間は待たずに即保存する
+    window.addEventListener('pagehide', saveAutosave);
 
     I.attach(canvas, ctx, project, state, draw, showProps);
 
-    // サンプルの最小構成を1つ置いておく(手応え確認用)
-    const r = M.addRegion(project, 'kyakushitsu', 4500, 3200);
-    r.x = 1000; r.y = 1000;
-    const k = M.addRegion(project, 'chubo', 2000, 3200);
-    k.x = 5500; k.y = 1000;
+    if (!saved) {
+      // サンプルの最小構成を1つ置いておく(手応え確認用)
+      const r = M.addRegion(project, 'kyakushitsu', 4500, 3200);
+      r.x = 1000; r.y = 1000;
+      const k = M.addRegion(project, 'chubo', 2000, 3200);
+      k.x = 5500; k.y = 1000;
+    }
 
     // レイアウト確定後に全体表示へ合わせる(初回描画のサイズ取りこぼし対策)
     requestAnimationFrame(() => {
@@ -202,7 +234,8 @@
     };
     $('btnFit').onclick = () => { R.fitToView(project, canvasCss()); draw(); };
     $('btnNew').onclick = () => {
-      if (!confirm('現在の図面を消して新規作成します。よろしいですか?')) return;
+      if (!confirm('現在の図面を消して新規作成します。よろしいですか?\n(自動保存された控えも消えます)')) return;
+      clearAutosave();
       project = M.defaultProject();
       state.selectedId = null;
       I.attach(canvas, ctx, project, state, draw, showProps);
@@ -365,6 +398,7 @@
   function draw() {
     R.render(ctx, canvasCss(), project, state);
     setDraftUi(state.draft); // 作図の進み具合に応じてボタン・ヒントを更新
+    scheduleAutosave();      // 変更が一段落したらブラウザ内に自動保存
   }
   function refresh() {
     draw();
@@ -593,6 +627,10 @@
     if (kind === 'furniture' || kind === 'fittings') {
       html += propNum(kind === 'fittings' ? '長さ(mm)' : '幅(mm)', 'w', el.w);
       html += propNum(kind === 'fittings' ? '厚み(mm)' : '奥行(mm)', 'h', el.h);
+      if (el.kind === 'counterL') {
+        // L字カウンターの腕の幅(天板の奥行)。外形 w×h の右下をくり抜く量が変わる
+        html += propNum('カウンター幅(mm)', 't', el.t || 600);
+      }
       html += propNum('角度(度)', 'rotation', el.rotation || 0);
     }
     if (kind === 'furniture') {

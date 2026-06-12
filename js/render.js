@@ -316,20 +316,39 @@
     ctx.rotate((f.rotation || 0) * Math.PI / 180);
     const over = typeof f.height === 'number' && f.height > global.Model.SIGHTLINE_LIMIT;
     ctx.fillStyle = over ? 'rgba(255,205,210,0.7)' : 'rgba(255,255,255,0.85)';
-    ctx.fillRect(-w / 2, -h / 2, w, h);
     ctx.lineWidth = opts.selected ? 3 : 1.5;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : (over ? '#c62828' : '#555');
-    ctx.strokeRect(-w / 2, -h / 2, w, h);
+    const isL = f.kind === 'counterL';
+    if (isL) {
+      // L字: 外形 w×h から右下を欠いた形。上辺が横の腕、左辺が縦の腕。
+      const t = Math.min(f.t || 600, f.w, f.h) * view.zoom;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2);          // 左上
+      ctx.lineTo(w / 2, -h / 2);           // 右上
+      ctx.lineTo(w / 2, -h / 2 + t);       // 右上から厚み分下へ
+      ctx.lineTo(-w / 2 + t, -h / 2 + t);  // 内側の角
+      ctx.lineTo(-w / 2 + t, h / 2);       // 左の腕の内側を下へ
+      ctx.lineTo(-w / 2, h / 2);           // 左下
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+    }
     // ラベルは既定200mm相当(調整可)。文字より小さい備品(つい立て等)には描かない
     // 番号(①②…)はサイズ違いの区別用(同じ種類・同じ寸法なら同じ番号)
     const fpx = fontPx(200, f);
-    if (Math.min(w, h) > fpx * 1.7) {
+    // L字はくり抜き部分を避けて上の腕の中央にラベルを置く
+    const labelY = isL ? -h / 2 + Math.min(f.t || 600, f.w, f.h) * view.zoom / 2 : 0;
+    const fitH = isL ? Math.min(f.t || 600, f.w, f.h) * view.zoom : h;
+    if (Math.min(w, fitH) > fpx * 1.7) {
       const num = opts.num ? global.Geometry.code(opts.num) : '';
       ctx.fillStyle = '#333';
       ctx.font = `${fpx}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(f.label + num, 0, 0);
+      ctx.fillText(f.label + num, 0, labelY);
     }
     ctx.restore();
   }
