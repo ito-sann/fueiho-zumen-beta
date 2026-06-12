@@ -439,9 +439,16 @@
       html = `<div class="prop-row"><span>種別</span><b>${kindLabel(el, kind)}</b></div>`;
     }
     html += propText('ラベル', 'label', el.label);
-    // ラベルを持つ要素は文字サイズを個別に指定できる(空欄なら全体設定に従う)
+    // ラベルを持つ要素は文字サイズを個別に調整できる(−/＋で増減、自動=全体設定)
     if (kind === 'regions' || kind === 'furniture' || kind === 'fittings') {
-      html += propNum('文字サイズ(mm)', 'fontMm', el.fontMm || '');
+      html += `<div class="prop-row"><span>文字サイズ</span>
+        <span class="font-ctrl">
+          <button type="button" id="fontMinus" class="btn small">−</button>
+          <input type="number" id="fontInput" step="10" min="0" placeholder="自動"
+                 value="${el.fontMm > 0 ? el.fontMm : ''}" title="実寸mm">
+          <button type="button" id="fontPlus" class="btn small">＋</button>
+          <button type="button" id="fontAuto" class="btn small">自動</button>
+        </span></div>`;
     }
     html += propNum('X位置(mm)', 'x', el.x);
     html += propNum('Y位置(mm)', 'y', el.y);
@@ -496,6 +503,32 @@
         if (areaEl) areaEl.textContent = G.regionAreaSqm(el).toFixed(4) + ' ㎡';
       });
     });
+    // 文字サイズの −/＋/自動。基準は「いま表示されている大きさ」(個別指定がなければ
+    // 種類ごとの既定×全体設定)で、そこから50mm刻みで増減する。
+    const fontInput = box.querySelector('#fontInput');
+    if (fontInput) {
+      const defaultMm = kind === 'regions' ? 320 : 200; // render.js の既定値と揃える
+      const currentMm = () => (el.fontMm > 0
+        ? el.fontMm
+        : Math.round(defaultMm * ((project.meta.fontScale || 100) / 100)));
+      const apply = (mm) => {
+        el.fontMm = Math.max(50, Math.round(mm / 10) * 10);
+        fontInput.value = el.fontMm;
+        refresh();
+      };
+      box.querySelector('#fontMinus').onclick = () => apply(currentMm() - 50);
+      box.querySelector('#fontPlus').onclick = () => apply(currentMm() + 50);
+      box.querySelector('#fontAuto').onclick = () => {
+        el.fontMm = 0;
+        fontInput.value = '';
+        refresh();
+      };
+      fontInput.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        el.fontMm = v > 0 ? v : 0;
+        refresh();
+      });
+    }
     // 区画の種別変更: ラベル・色・通し番号を新しい種別に合わせて付け直す
     const typeSel = box.querySelector('#propType');
     if (typeSel) {

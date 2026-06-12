@@ -94,6 +94,11 @@ table.summary td { text-align: right; font-weight: 700; padding: 4px 2px; }
 .props .prop-row b { color: #1f2937; }
 .props .btn { margin-top: 8px; width: 100%; }
 
+/* 文字サイズの −/＋/自動 コントロール */
+.font-ctrl { display: flex; gap: 4px; flex: 1; align-items: center; }
+.font-ctrl input { width: 56px; min-width: 0; flex: 1; text-align: right; }
+.font-ctrl .btn { padding: 4px 8px; flex: 0 0 auto; }
+
 /* 多角形の頂点編集(P1: X / Y を横並びで) */
 .props .vertex-row { gap: 4px; }
 .props .vertex-row span { flex: 0 0 28px; }
