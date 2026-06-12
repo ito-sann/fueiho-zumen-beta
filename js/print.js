@@ -7,9 +7,11 @@
   'use strict';
 
   function tableHtml(title, table) {
-    let rows = table.rows.map((r) =>
-      `<tr><td>${r.code}</td><td>${escapeHtml(r.label)}</td><td>${r.expr}</td><td class="num">${r.area.toFixed(4)} ㎡</td></tr>`
-    ).join('');
+    // 柱の控除行(area が負)は「△0.0900 ㎡」のように差し引きとして表示する
+    let rows = table.rows.map((r) => {
+      const area = r.area < 0 ? `△${Math.abs(r.area).toFixed(4)}` : r.area.toFixed(4);
+      return `<tr><td>${r.code}</td><td>${escapeHtml(r.label)}</td><td>${r.expr}</td><td class="num">${area} ㎡</td></tr>`;
+    }).join('');
     return `
       <table class="kyuseki">
         <caption>${escapeHtml(title)}</caption>
@@ -221,18 +223,21 @@ ${bodyHtml}
     const ctx = cv.getContext('2d');
     R.setLayer(layer);
     R.fitToView(project, cv);
-    R.render(ctx, cv, project, { selectedId: null });
+    // print: true … 下絵(トレース用画像)は提出書類に含めない
+    R.render(ctx, cv, project, { selectedId: null }, { print: true });
 
     R.setLayer(prevLayer);
     v.zoom = prev.zoom; v.offsetX = prev.offsetX; v.offsetY = prev.offsetY;
     return cv.toDataURL('image/png');
   }
 
-  /* 現在の図面(レイヤー)を印刷する */
+  /* 現在の図面(レイヤー)を印刷する。
+   * 画面のキャンバスではなくオフスクリーンで描き直すことで、
+   * 下絵(トレース画像)や画面のパン・ズーム状態に左右されない出力にする。 */
   function printCurrent(project, canvas) {
     const layer = global.Render.getLayer();
     const drawingName = global.Render.LAYERS[layer].label;
-    const img = canvas.toDataURL('image/png');
+    const img = renderLayerImage(project, layer, 1600, 1100);
     const title = `${drawingName} - ${project.meta.storeName || ''}`;
     openWindow(project, title, sheetHtml(project, layer, img));
   }

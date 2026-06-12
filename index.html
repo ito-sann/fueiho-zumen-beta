@@ -8,13 +8,15 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.4.3">
+  <link rel="stylesheet" href="css/style.css?v=1.5.0">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">深夜酒類 図面エディタ<span class="tag">届出用 平面図 / 求積図</span></div>
     <div class="layer-tabs" id="layerTabs"></div>
     <div class="top-actions">
+      <button id="btnUndo" class="btn" title="元に戻す (Cmd/Ctrl+Z)">↩ 戻す</button>
+      <button id="btnRedo" class="btn" title="やり直す (Shift+Cmd/Ctrl+Z)">↪ やり直す</button>
       <button id="btnChecklist" class="btn">必要書類</button>
       <button id="btnForms" class="btn">届出書作成</button>
       <button id="btnSave"  class="btn">保存</button>
@@ -28,6 +30,16 @@
   <main class="workspace">
     <!-- 左:ツール -->
     <aside class="panel left">
+      <section class="group">
+        <h3>案件</h3>
+        <select id="caseSelect" class="block"></select>
+        <div class="add-row">
+          <button id="btnCaseNew" class="btn small">新しい案件</button>
+          <button id="btnCaseDel" class="btn small danger">この案件を削除</button>
+        </div>
+        <p class="muted">案件ごとにブラウザ内へ自動保存されます。案件名は店舗名から自動でつきます。大事な案件はファイル保存も併用してください。</p>
+      </section>
+
       <section class="group">
         <h3>区画を追加</h3>
         <div class="add-row">
@@ -78,6 +90,20 @@
       </section>
 
       <section class="group">
+        <h3>下絵(間取り図トレース)</h3>
+        <input type="file" id="underlayFile" accept="image/*" hidden>
+        <button id="btnUnderlay" class="btn block">画像を読み込む</button>
+        <div id="underlayCtrls" style="display:none">
+          <label class="field">下絵の横幅 <input type="number" id="underlayW" step="100" min="500"> mm</label>
+          <label class="field">濃さ <input type="range" id="underlayOpacity" min="10" max="100" value="50"></label>
+          <label class="check-row"><input type="checkbox" id="underlayShow" checked> 下絵を表示</label>
+          <label class="check-row"><input type="checkbox" id="underlayMove"> 下絵を動かす(ドラッグ)</label>
+          <button id="btnUnderlayDel" class="btn block danger">下絵を削除</button>
+        </div>
+        <p class="muted">間取り図や手描きスケッチの画像を背景に薄く表示し、その上をなぞって作図できます。「下絵の横幅」を実際の寸法(mm)に合わせると縮尺が合います。下絵はPDFには印刷されません。</p>
+      </section>
+
+      <section class="group">
         <h3>備品を追加</h3>
         <div class="add-row">
           <select id="furnKind"></select>
@@ -91,6 +117,8 @@
           <select id="fittingKind"></select>
           <button id="btnAddFitting" class="btn small">追加</button>
         </div>
+        <label class="check-row"><input type="checkbox" id="deductPillars"> 柱の面積を区画の面積から差し引く</label>
+        <p class="muted">チェックすると、柱が立っている区画(客室・調理場など)の求積表に「△0.09㎡」のような控除行が入り、合計から差し引かれます。扱いは警察署により異なるため切り替え式です。</p>
       </section>
 
       <section class="group">
@@ -205,12 +233,12 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.4.3"></script>
-  <script src="js/geometry.js?v=1.4.3"></script>
-  <script src="js/render.js?v=1.4.3"></script>
-  <script src="js/interactions.js?v=1.4.3"></script>
-  <script src="js/print.js?v=1.4.3"></script>
-  <script src="js/forms.js?v=1.4.3"></script>
-  <script src="js/main.js?v=1.4.3"></script>
+  <script src="js/model.js?v=1.5.0"></script>
+  <script src="js/geometry.js?v=1.5.0"></script>
+  <script src="js/render.js?v=1.5.0"></script>
+  <script src="js/interactions.js?v=1.5.0"></script>
+  <script src="js/print.js?v=1.5.0"></script>
+  <script src="js/forms.js?v=1.5.0"></script>
+  <script src="js/main.js?v=1.5.0"></script>
 </body>
 </html>

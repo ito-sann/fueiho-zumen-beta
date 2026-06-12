@@ -168,6 +168,14 @@
         return;
       }
 
+      // 「下絵を動かす」モード中はどこをドラッグしても下絵の移動になる
+      if (state.underlayMove && project.underlay) {
+        mode = 'underlay';
+        grabOffset = { x: w.x - project.underlay.x, y: w.y - project.underlay.y };
+        last = p;
+        return;
+      }
+
       // 方位記号の先端(N)をつかんだら回転モード(非表示中はつかめない)
       if (project.meta.showNorthMark) {
         const nm = global.Render.getNorthMark(cssCanvas(), project);
@@ -232,6 +240,15 @@
         global.Model.normalizePolygon(dragTarget);
         onChange();
         onSelect(dragTarget);
+      } else if (mode === 'underlay' && project.underlay) {
+        // 下絵の移動(スナップあり・Shiftで自由)
+        const w = global.Render.screenToWorld(p.x, p.y);
+        let nx = w.x - grabOffset.x;
+        let ny = w.y - grabOffset.y;
+        if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); }
+        project.underlay.x = nx;
+        project.underlay.y = ny;
+        onChange();
       } else if (mode === 'pan') {
         global.Render.view.offsetX += p.x - last.x;
         global.Render.view.offsetY += p.y - last.y;

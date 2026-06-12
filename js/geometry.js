@@ -118,7 +118,9 @@
 
   /* 種類でフィルタした求積表(行 + 合計)
    * 各部屋は第4位。合計は第4位の値を足し込み、最後に第2位へ丸める(総面積)。
-   * 符号は project.regions 全体での並び順(①②③…)。 */
+   * 符号は project.regions 全体での並び順(①②③…)。
+   * 「柱の面積を差し引く」設定が有効なら、柱が立っている区画の直後に
+   * 控除行(面積が負の行。表では △ 付きで表示)を挟み、合計からも差し引く。 */
   function buildTable(project, filterTypes) {
     const rows = [];
     let totalCalc = 0;
@@ -128,8 +130,98 @@
       row.code = code(i + 1);
       rows.push(row);
       totalCalc += row.area;
+      for (const d of pillarDeductions(project, r)) {
+        rows.push(d);
+        totalCalc += d.area; // d.area は負の値
+      }
     });
     return { rows, total: round2(totalCalc) };
+  }
+
+  /* ---- 柱の面積控除 ---- */
+
+  /* 点(絶対mm)が区画の内側にあるか。回転した基本図形にも対応する。 */
+  function pointInRegion(region, wx, wy) {
+    if (region.shape === 'polygon') {
+      const pts = region.points || [];
+      let inside = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const xi = region.x + pts[i].x, yi = region.y + pts[i].y;
+        const xj = region.x + pts[j].x, yj = region.y + pts[j].y;
+        if ((yi > wy) !== (yj > wy) &&
+            wx < (xj - xi) * (wy - yi) / (yj - yi) + xi) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    }
+    // 基本図形: 中心まわりに -rotation だけ戻し、中心原点の局所座標で判定する
+    const cx = region.x + region.w / 2, cy = region.y + region.h / 2;
+    const a = -(region.rotation || 0) * Math.PI / 180;
+    const dx = wx - cx, dy = wy - cy;
+    const lx = dx * Math.cos(a) - dy * Math.sin(a);
+    const ly = dx * Math.sin(a) + dy * Math.cos(a);
+    const w = region.w, h = region.h;
+    let local;
+    if (region.shape === 'triangle') {
+      local = [[-w / 2, h / 2], [w / 2, h / 2], [-w / 2, -h / 2]];
+    } else if (region.shape === 'trapezoid') {
+      const t = (region.w2 != null ? region.w2 : region.w) / 2;
+      local = [[-w / 2, h / 2], [w / 2, h / 2], [t, -h / 2], [-t, -h / 2]];
+    } else {
+      return Math.abs(lx) <= w / 2 && Math.abs(ly) <= h / 2;
+    }
+    let inside = false;
+    for (let i = 0, j = local.length - 1; i < local.length; j = i++) {
+      const xi = local[i][0], yi = local[i][1];
+      const xj = local[j][0], yj = local[j][1];
+      if ((yi > ly) !== (yj > ly) &&
+          lx < (xj - xi) * (ly - yi) / (yj - yi) + xi) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  /* 区画の中に立っている柱(中心点で判定)を返す */
+  function pillarsInRegion(project, region) {
+    return (project.fittings || []).filter((g) =>
+      g.kind === 'pillar' &&
+      pointInRegion(region, g.x + g.w / 2, g.y + g.h / 2));
+  }
+
+  /* 区画1つ分の柱の控除行。同じ寸法の柱はまとめて「0.30 × 0.30 × 2本」にする。
+   * 行の area は負(合計から差し引く)。設定が無効なら空配列。 */
+  function pillarDeductions(project, region) {
+    if (!project.meta || !project.meta.deductPillars) return [];
+    const groups = new Map();
+    for (const g of pillarsInRegion(project, region)) {
+      const key = `${g.w}|${g.h}`;
+      if (!groups.has(key)) groups.set(key, { w: g.w, h: g.h, count: 0 });
+      groups.get(key).count++;
+    }
+    return Array.from(groups.values()).map((g) => {
+      const wM = mmToM(g.w), hM = mmToM(g.h);
+      const one = round4(wM * hM);
+      const area = round4(one * g.count);
+      const expr = `${wM.toFixed(2)} × ${hM.toFixed(2)}` +
+        (g.count > 1 ? ` × ${g.count}本` : '');
+      return {
+        id: null,
+        deduct: true,
+        label: `柱(${region.label}内)`,
+        expr: `△ ${expr}`,
+        code: '',
+        area: -area,
+      };
+    });
+  }
+
+  /* 柱の控除後の区画面積(㎡・第4位)。設定が無効なら通常の面積と同じ。 */
+  function regionNetAreaSqm(project, region) {
+    let a = regionAreaSqm(region);
+    for (const d of pillarDeductions(project, region)) a = round4(a + d.area);
+    return a;
   }
 
   /* ---- 営業所外周(壁芯)の求積 ---- */
@@ -290,8 +382,9 @@
   function kyakushitsuSizeWarnings(project) {
     const rooms = project.regions.filter((r) => r.type === 'kyakushitsu');
     if (rooms.length <= 1) return [];
+    // 柱の控除が有効なら、控除後の床面積で判定する
     return rooms
-      .map((r) => ({ id: r.id, label: r.label, area: regionAreaSqm(r) }))
+      .map((r) => ({ id: r.id, label: r.label, area: regionNetAreaSqm(project, r) }))
       .filter((x) => x.area < KYAKUSHITSU_MIN_SQM);
   }
 
@@ -339,6 +432,11 @@
     for (const x of project.fixtures) {
       consider(x.x, x.y);
     }
+    // 下絵(表示中のみ)。「全体表示にもどす」で下絵も見える範囲に入れる
+    const u = project.underlay;
+    if (u && u.visible !== false) {
+      consider(u.x, u.y); consider(u.x + u.w, u.y + u.h);
+    }
     if (!isFinite(minX)) {
       return { x: 0, y: 0, w: 8000, h: 6000 };
     }
@@ -347,6 +445,7 @@
 
   global.Geometry = {
     mmToM, fmtM, code, regionCalc, regionAreaSqm, regionRow, buildTable,
+    pointInRegion, pillarsInRegion, pillarDeductions, regionNetAreaSqm,
     polygonCalc, polygonEdgesM, polygonPointsM,
     offsetPolygonAbs, premiseCenterlineAbs, premiseWallPolysAbs, premiseRegionLike, premiseCalc,
     furnitureGroups, furnitureNumberMap,

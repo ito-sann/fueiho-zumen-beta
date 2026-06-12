@@ -114,7 +114,12 @@
         premisesMethod: 'regions',
         /* 求積図の線色: 'mono'=黒 / 'police'=営業所:青・客室:赤・調理場:緑(慣行色) */
         colorMode: 'mono',
+        /* 柱の面積を、柱が立っている区画(客室・調理場など)の面積から差し引くか */
+        deductPillars: false,
       },
+      /* 下絵(間取り図などの画像をなぞる用)。未設定なら null。
+       *   src=画像(dataURL), x,y=左上(mm), w,h=実寸(mm), opacity=不透明度(0〜1) */
+      underlay: null,
       /* 営業所外周(壁芯求積用)。多角形1つ + 壁厚。未作成なら null。
        *   measuredAt: 'inner'=内側の寸法で入力(壁芯線は壁厚/2だけ外側に自動生成)
        *               'center'=壁芯の寸法で入力(そのまま壁芯線になる) */
@@ -315,6 +320,7 @@
     project.fittings = obj.fittings || [];
     project.fixtures = obj.fixtures || [];
     project.premise = obj.premise || null;
+    project.underlay = obj.underlay || null;
     project.checklist = Object.assign({ corp: false, items: {} }, obj.checklist || {});
     project.checklist.items = (obj.checklist && obj.checklist.items) || {};
     if (typeof project._seq !== 'number') {

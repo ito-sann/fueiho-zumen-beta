@@ -109,6 +109,37 @@
     ctx.restore();
   }
 
+  /* ---- 下絵(間取り図のトレース用画像) ----
+   * 画像の読み込みは非同期なので、読み込み完了時に再描画してもらうための
+   * コールバックを main.js から登録する。 */
+  let redrawCb = null;
+  function setRedrawCallback(fn) { redrawCb = fn; }
+  const ulCache = { src: null, img: null, ready: false };
+  function underlayImage(src) {
+    if (ulCache.src !== src) {
+      ulCache.src = src;
+      ulCache.ready = false;
+      const img = new Image();
+      img.onload = () => { ulCache.ready = true; if (redrawCb) redrawCb(); };
+      img.src = src;
+      ulCache.img = img;
+    }
+    return ulCache.ready ? ulCache.img : null;
+  }
+
+  /* 下絵をグリッドの上・図面要素の下に薄く描く。印刷(PDF)には含めない。 */
+  function drawUnderlay(ctx, project) {
+    const u = project.underlay;
+    if (!u || !u.src || u.visible === false) return;
+    const img = underlayImage(u.src);
+    if (!img) return;
+    const tl = worldToScreen(u.x, u.y);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, Math.max(0.05, u.opacity != null ? u.opacity : 0.5));
+    ctx.drawImage(img, tl.x, tl.y, u.w * view.zoom, u.h * view.zoom);
+    ctx.restore();
+  }
+
   /* 形ごとの頂点(中心原点・画面px)。w,h,w2 は px。 */
   function shapePoints(shape, w, h, w2) {
     if (shape === 'triangle') {
@@ -873,7 +904,7 @@
     return null;
   }
 
-  function render(ctx, canvas, project, state) {
+  function render(ctx, canvas, project, state, opts) {
     const vis = visibility(currentLayer);
     fontScale = (project.meta.fontScale || 100) / 100; // 全体の文字サイズ設定を反映
     clear(ctx, canvas);
@@ -886,6 +917,11 @@
     if (currentLayer === 'furnviews') {
       drawFurnViews(ctx, canvas, project);
       return;
+    }
+
+    // 下絵(トレース用)。画面での作図補助なので、印刷・PDF出力には含めない
+    if (!(opts && opts.print)) {
+      drawUnderlay(ctx, project);
     }
 
     // 営業所外周(壁)。平面図・営業所求積図でははっきり、その他では薄く描く
@@ -949,6 +985,6 @@
   global.Render = {
     view, LAYERS, setLayer, getLayer, visibility,
     worldToScreen, screenToWorld, fitToView, render,
-    paperFrameWorld, getNorthMark,
+    paperFrameWorld, getNorthMark, setRedrawCallback,
   };
 })(window);

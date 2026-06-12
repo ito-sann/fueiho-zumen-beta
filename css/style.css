@@ -161,3 +161,7 @@ ul.checklist input { margin-right: 8px; }
   display: inline-block; background: #e0e7ff; color: #3730a3;
   font-size: 10px; padding: 1px 6px; border-radius: 8px; vertical-align: 1px;
 }
+
+/* ---- 案件・下絵の操作欄 ---- */
+#caseSelect { margin-bottom: 6px; }
+.field input[type=range] { padding: 0; }

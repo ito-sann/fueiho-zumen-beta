@@ -13,44 +13,180 @@
   const canvas = $('canvas');
   const ctx = canvas.getContext('2d');
 
-  /* ---- 自動保存(localStorage) ----
-   * 変更のたびに少し待ってからブラウザ内へ保存し、次回開いたとき自動復元する。
-   * ファイルの「保存」ボタンとは別物(こちらはこのブラウザ限りの控え)。 */
-  const AUTOSAVE_KEY = 'shinya-zumen-autosave';
+  /* ---- 案件ごとの自動保存(localStorage) ----
+   * 案件(店舗)ごとに別の控えとしてブラウザ内へ自動保存し、左パネルの
+   * 「案件」欄で切り替えられる。ファイルの「保存」ボタンとは別物。 */
+  const CASES_KEY = 'shinya-zumen-cases';     // 案件の一覧(id・名前・更新日時)
+  const CURRENT_KEY = 'shinya-zumen-current'; // 最後に開いていた案件のid
+  const LEGACY_KEY = 'shinya-zumen-autosave'; // 旧版(1案件のみ)の控え
+  const caseKey = (id) => `shinya-zumen-case-${id}`;
+  let currentCaseId = null;
   let autosaveTimer = null;
+
+  function readCases() {
+    try { return JSON.parse(localStorage.getItem(CASES_KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function writeCases(list) {
+    try { localStorage.setItem(CASES_KEY, JSON.stringify(list)); } catch (e) { /* 何もしない */ }
+  }
+  function newCaseId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+  function caseName() {
+    return (project.meta.storeName || '').trim() || '無題の案件';
+  }
   function saveAutosave() {
+    if (!currentCaseId) return;
     try {
-      localStorage.setItem(AUTOSAVE_KEY, M.serialize(project));
+      localStorage.setItem(caseKey(currentCaseId), M.serialize(project));
+      localStorage.setItem(CURRENT_KEY, currentCaseId);
+      const list = readCases();
+      const it = list.find((c) => c.id === currentCaseId);
+      if (it) { it.name = caseName(); it.updatedAt = Date.now(); }
+      else list.push({ id: currentCaseId, name: caseName(), updatedAt: Date.now() });
+      writeCases(list);
+      buildCaseSelect();
     } catch (e) { /* プライベートモードや容量超過では保存できないが、操作は止めない */ }
   }
   function scheduleAutosave() {
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(saveAutosave, 800);
   }
-  function loadAutosave() {
+  function loadCase(id) {
     try {
-      const text = localStorage.getItem(AUTOSAVE_KEY);
+      const text = localStorage.getItem(caseKey(id));
       return text ? M.deserialize(text) : null;
-    } catch (e) { return null; } // 壊れた控えは無視してサンプルから始める
+    } catch (e) { return null; } // 壊れた控えは無視する
   }
-  function clearAutosave() {
-    try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) { /* 何もしない */ }
+  /* 旧版(案件1つだけの自動保存)の控えを、案件形式に引っ越す */
+  function migrateLegacy() {
+    try {
+      const text = localStorage.getItem(LEGACY_KEY);
+      if (!text) return;
+      const id = newCaseId();
+      localStorage.setItem(caseKey(id), text);
+      let name = '前回の図面';
+      try { name = (JSON.parse(text).meta || {}).storeName || name; } catch (e) { /* 既定名のまま */ }
+      const list = readCases();
+      list.push({ id, name, updatedAt: Date.now() });
+      writeCases(list);
+      localStorage.setItem(CURRENT_KEY, id);
+      localStorage.removeItem(LEGACY_KEY);
+    } catch (e) { /* 引っ越せなければ何もしない */ }
+  }
+  /* 案件セレクトの中身を作り直す(更新が新しい順) */
+  function buildCaseSelect() {
+    const sel = $('caseSelect');
+    if (!sel || document.activeElement === sel) return; // 操作中は作り直さない
+    const list = readCases().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    sel.innerHTML = '';
+    for (const c of list) sel.add(new Option(c.name, c.id));
+    sel.value = currentCaseId;
+  }
+
+  /* ---- 元に戻す / やり直す(操作履歴) ----
+   * 操作が一段落するたびに図面全体の写しを積み、Cmd/Ctrl+Z で1つ前に戻す。
+   * 案件の切り替え・読み込み・新規では履歴を仕切り直す。 */
+  const history = { stack: [], index: -1, timer: null };
+  const HISTORY_LIMIT = 60;
+  function recordHistory() {
+    const snap = M.serialize(project);
+    if (history.stack[history.index] === snap) return; // 見た目だけの変更(パン等)は積まない
+    history.stack = history.stack.slice(0, history.index + 1);
+    history.stack.push(snap);
+    if (history.stack.length > HISTORY_LIMIT) history.stack.shift();
+    history.index = history.stack.length - 1;
+    updateUndoButtons();
+  }
+  function scheduleHistory() {
+    clearTimeout(history.timer);
+    history.timer = setTimeout(recordHistory, 400);
+  }
+  function flushHistory() {
+    clearTimeout(history.timer);
+    recordHistory();
+  }
+  function resetHistory() {
+    clearTimeout(history.timer);
+    history.stack = [M.serialize(project)];
+    history.index = 0;
+    updateUndoButtons();
+  }
+  function undo() {
+    flushHistory();
+    if (history.index <= 0) return;
+    history.index--;
+    adoptProject(M.deserialize(history.stack[history.index]), { keepView: true });
+    updateUndoButtons();
+  }
+  function redo() {
+    flushHistory();
+    if (history.index >= history.stack.length - 1) return;
+    history.index++;
+    adoptProject(M.deserialize(history.stack[history.index]), { keepView: true });
+    updateUndoButtons();
+  }
+  function updateUndoButtons() {
+    const u = $('btnUndo'), r = $('btnRedo');
+    if (u) u.disabled = history.index <= 0;
+    if (r) r.disabled = history.index >= history.stack.length - 1;
+  }
+  /* Cmd/Ctrl+Z=元に戻す, Shift+Cmd/Ctrl+Z または Ctrl+Y=やり直す。
+   * 入力欄の中ではブラウザ標準の取り消しを邪魔しない。 */
+  function onUndoKeys(e) {
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) redo(); else undo();
+    } else if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      redo();
+    }
+  }
+
+  /* 図面オブジェクトを差し替えて画面全体を作り直す(読み込み・案件切替・元に戻す共通) */
+  function adoptProject(p, opts) {
+    project = p;
+    state.selectedId = null;
+    I.attach(canvas, ctx, project, state, draw, showProps);
+    bindMeta();
+    if (!(opts && opts.keepView)) R.fitToView(project, canvasCss());
+    refresh();
+    showProps(null);
   }
 
   /* ---- 初期化 ---- */
   function init() {
-    // 前回の続き(自動保存)があれば復元する
-    const saved = loadAutosave();
+    migrateLegacy();
+    // 前回の続き(自動保存)があれば、最後に開いていた案件を復元する
+    let saved = null;
+    const cases = readCases();
+    if (cases.length) {
+      let lastId = null;
+      try { lastId = localStorage.getItem(CURRENT_KEY); } catch (e) { /* 既定のまま */ }
+      const pick = cases.find((c) => c.id === lastId) ||
+        cases.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+      currentCaseId = pick.id;
+      saved = loadCase(pick.id);
+    }
     if (saved) project = saved;
+    if (!currentCaseId) currentCaseId = newCaseId();
 
     buildSelects();
     buildLayerTabs();
     bindToolbar();
     bindMeta();
+    buildCaseSelect();
     resizeCanvas();
     window.addEventListener('resize', () => { resizeCanvas(); draw(); });
     // タブを閉じる・リロードする瞬間は待たずに即保存する
     window.addEventListener('pagehide', saveAutosave);
+    // 下絵画像の読み込み完了時に描き直してもらう
+    R.setRedrawCallback(draw);
+    // Cmd/Ctrl+Z で元に戻す(Shift付きでやり直す)
+    window.addEventListener('keydown', onUndoKeys);
 
     I.attach(canvas, ctx, project, state, draw, showProps);
 
@@ -61,6 +197,7 @@
       const k = M.addRegion(project, 'chubo', 2000, 3200);
       k.x = 5500; k.y = 1000;
     }
+    resetHistory();
 
     // レイアウト確定後に全体表示へ合わせる(初回描画のサイズ取りこぼし対策)
     requestAnimationFrame(() => {
@@ -122,6 +259,84 @@
 
   /* ---- ツールバー配線 ---- */
   function bindToolbar() {
+    $('btnUndo').onclick = () => undo();
+    $('btnRedo').onclick = () => redo();
+
+    // 案件の切り替え・追加・削除(自動保存はブラウザ内に案件ごと)
+    $('caseSelect').onchange = (e) => {
+      const id = e.target.value;
+      if (id === currentCaseId) return;
+      saveAutosave(); // 切り替える前に今の案件を確実に保存する
+      const p = loadCase(id);
+      if (!p) {
+        alert('この案件の控えを読み込めませんでした。');
+        buildCaseSelect();
+        return;
+      }
+      currentCaseId = id;
+      try { localStorage.setItem(CURRENT_KEY, id); } catch (err) { /* 何もしない */ }
+      adoptProject(p);
+      resetHistory();
+      buildCaseSelect();
+    };
+    $('btnCaseNew').onclick = () => {
+      saveAutosave(); // 今の案件を保存してから白紙の案件を作る
+      currentCaseId = newCaseId();
+      adoptProject(M.defaultProject());
+      resetHistory();
+      saveAutosave(); // 一覧に登録してセレクトを更新
+    };
+    $('btnCaseDel').onclick = () => {
+      const list = readCases();
+      if (list.length <= 1) {
+        alert('案件が1件しかないため削除できません。\n中身を消したいときは「新規(クリア)」を使ってください。');
+        return;
+      }
+      if (!confirm(`案件「${caseName()}」を削除します。よろしいですか?\n(この案件の自動保存の控えも消えます)`)) return;
+      try { localStorage.removeItem(caseKey(currentCaseId)); } catch (e) { /* 何もしない */ }
+      const rest = readCases().filter((c) => c.id !== currentCaseId);
+      writeCases(rest);
+      const next = rest.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+      currentCaseId = next.id;
+      adoptProject(loadCase(next.id) || M.defaultProject());
+      resetHistory();
+      buildCaseSelect();
+    };
+
+    // 下絵(間取り図のトレース)
+    $('btnUnderlay').onclick = () => $('underlayFile').click();
+    $('underlayFile').onchange = loadUnderlayFile;
+    $('underlayW').onchange = (e) => {
+      const u = project.underlay;
+      if (!u) return;
+      const w = Math.max(500, parseInt(e.target.value, 10) || 0);
+      u.h = Math.round(w * (u.h / u.w)); // 縦横の比率は変えない
+      u.w = w;
+      e.target.value = w;
+      refresh();
+    };
+    $('underlayOpacity').oninput = (e) => {
+      if (project.underlay) {
+        project.underlay.opacity = parseInt(e.target.value, 10) / 100;
+        draw();
+      }
+    };
+    $('underlayShow').onchange = (e) => {
+      if (project.underlay) {
+        project.underlay.visible = e.target.checked;
+        draw();
+      }
+    };
+    $('underlayMove').onchange = (e) => { state.underlayMove = e.target.checked; };
+    $('btnUnderlayDel').onclick = () => {
+      if (!project.underlay) return;
+      if (!confirm('下絵を削除します。よろしいですか?')) return;
+      project.underlay = null;
+      state.underlayMove = false;
+      syncUnderlayUi();
+      refresh();
+    };
+
     $('btnAddRegion').onclick = () => {
       const type = $('regionType').value;
       const shape = $('regionShape').value;
@@ -234,14 +449,10 @@
     };
     $('btnFit').onclick = () => { R.fitToView(project, canvasCss()); draw(); };
     $('btnNew').onclick = () => {
-      if (!confirm('現在の図面を消して新規作成します。よろしいですか?\n(自動保存された控えも消えます)')) return;
-      clearAutosave();
-      project = M.defaultProject();
-      state.selectedId = null;
-      I.attach(canvas, ctx, project, state, draw, showProps);
-      bindMeta();
-      R.fitToView(project, canvasCss());
-      refresh(); showProps(null);
+      if (!confirm('この案件の図面を消して白紙にします。よろしいですか?\n(この案件の自動保存の控えも白紙になります)')) return;
+      adoptProject(M.defaultProject());
+      resetHistory();
+      saveAutosave();
     };
     $('snapSelect').onchange = (e) => I.setSnap(parseInt(e.target.value, 10));
     $('btnSave').onclick = saveFile;
@@ -377,9 +588,12 @@
     $('premMethod').value = m.premisesMethod || 'regions';
     $('premWall').value = project.premise ? project.premise.wallThickness : 100;
     $('premMeasured').value = project.premise ? project.premise.measuredAt : 'inner';
-    $('metaStore').oninput = (e) => m.storeName = e.target.value;
-    $('metaAddr').oninput  = (e) => m.address = e.target.value;
-    $('metaAuthor').oninput= (e) => m.author = e.target.value;
+    $('deductPillars').checked = m.deductPillars === true;
+    syncUnderlayUi();
+    // 文字情報も自動保存と履歴の対象にする(店舗名は案件名にもなる)
+    $('metaStore').oninput = (e) => { m.storeName = e.target.value; scheduleAutosave(); scheduleHistory(); };
+    $('metaAddr').oninput  = (e) => { m.address = e.target.value; scheduleAutosave(); scheduleHistory(); };
+    $('metaAuthor').oninput= (e) => { m.author = e.target.value; scheduleAutosave(); scheduleHistory(); };
     // 縮尺・用紙・向きは用紙枠ガイドの大きさに効くので、変更したら再描画する
     $('metaScale').onchange = (e) => { m.scale = parseInt(e.target.value, 10); draw(); };
     $('metaPaper').onchange = (e) => { m.paper = e.target.value; draw(); };
@@ -390,6 +604,8 @@
     $('metaColors').onchange = (e) => { m.colorMode = e.target.value; draw(); };
     // 営業所求積の方式(署のローカルルール)。求積表とサマリーに反映する
     $('premMethod').onchange = (e) => { m.premisesMethod = e.target.value; refresh(); };
+    // 柱の面積を区画(客室・調理場など)の面積から差し引くか
+    $('deductPillars').onchange = (e) => { m.deductPillars = e.target.checked; refresh(); };
     // 設備図コメントは凡例に即時反映させるため、入力のたびに再描画する
     $('fixNote').oninput = (e) => { m.lightingNote = e.target.value; draw(); };
   }
@@ -399,6 +615,7 @@
     R.render(ctx, canvasCss(), project, state);
     setDraftUi(state.draft); // 作図の進み具合に応じてボタン・ヒントを更新
     scheduleAutosave();      // 変更が一段落したらブラウザ内に自動保存
+    scheduleHistory();       // 「元に戻す」用の履歴も同じタイミングで積む
   }
   function refresh() {
     draw();
@@ -429,8 +646,11 @@
   }
 
   function kyusekiTableHtml(title, t) {
-    let rows = t.rows.map((r) =>
-      `<tr><td>${r.code}</td><td>${esc(r.label)}</td><td>${r.expr}</td><td>${r.area.toFixed(4)}</td></tr>`).join('');
+    // 柱の控除行(面積が負)は「△0.0900」のように差し引きとして表示する
+    let rows = t.rows.map((r) => {
+      const area = r.area < 0 ? `△${Math.abs(r.area).toFixed(4)}` : r.area.toFixed(4);
+      return `<tr><td>${r.code}</td><td>${esc(r.label)}</td><td>${r.expr}</td><td>${area}</td></tr>`;
+    }).join('');
     if (!rows) rows = '<tr><td colspan="4" class="muted">区画がありません</td></tr>';
     return `
       <div class="kyuseki-title">${title}</div>
@@ -790,6 +1010,63 @@
       <input type="number" step="10" data-field="${field}" value="${val}"></label>`;
   }
 
+  /* ---- 下絵(間取り図のトレース用画像) ---- */
+
+  /* 画像を読み込み、ブラウザ内保存に収まるよう長辺1600pxへ縮小してから下絵にする */
+  function loadUnderlayFile(e) {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1600;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(img.width * scale));
+      cv.height = Math.max(1, Math.round(img.height * scale));
+      const c = cv.getContext('2d');
+      c.fillStyle = '#fff';
+      c.fillRect(0, 0, cv.width, cv.height); // 透過PNGは白地にしてJPEG化
+      c.drawImage(img, 0, 0, cv.width, cv.height);
+      const src = cv.toDataURL('image/jpeg', 0.8);
+      const wMm = 10000; // 仮の横幅10m。「下絵の横幅」で実際の寸法に合わせてもらう
+      project.underlay = {
+        src,
+        x: 0,
+        y: 0,
+        w: wMm,
+        h: Math.round(wMm * cv.height / cv.width),
+        opacity: 0.5,
+        visible: true,
+      };
+      syncUnderlayUi();
+      R.fitToView(project, canvasCss());
+      refresh();
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      alert('画像を読み込めませんでした。JPEG・PNGなどの画像ファイルを選んでください。');
+    };
+    img.src = url;
+  }
+
+  /* 下絵の操作欄を、今の下絵の状態に合わせて表示し直す */
+  function syncUnderlayUi() {
+    const u = project.underlay;
+    $('underlayCtrls').style.display = u ? '' : 'none';
+    $('btnUnderlay').textContent = u ? '別の画像に差し替える' : '画像を読み込む';
+    if (u) {
+      $('underlayW').value = u.w;
+      $('underlayOpacity').value = Math.round((u.opacity != null ? u.opacity : 0.5) * 100);
+      $('underlayShow').checked = u.visible !== false;
+    } else {
+      state.underlayMove = false;
+    }
+    $('underlayMove').checked = !!state.underlayMove;
+  }
+
   /* ---- 保存 / 読み込み ---- */
   function saveFile() {
     const text = M.serialize(project);
@@ -807,12 +1084,9 @@
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        project = M.deserialize(reader.result);
-        state.selectedId = null;
-        I.attach(canvas, ctx, project, state, draw, showProps);
-        bindMeta();
-        R.fitToView(project, canvasCss());
-        refresh(); showProps(null);
+        // 開いた内容は今の案件の控えとして自動保存される
+        adoptProject(M.deserialize(reader.result));
+        resetHistory();
       } catch (err) {
         alert('読み込みに失敗しました: ' + err.message);
       }
