@@ -675,7 +675,9 @@
     if (state.draft && state.draft.points) {
       drawDraft(ctx, state.draft);
     }
-    drawNorthMark(ctx, canvas, project);
+    if (project.meta.showNorthMark) {
+      drawNorthMark(ctx, canvas, project);
+    }
   }
 
   global.Render = {

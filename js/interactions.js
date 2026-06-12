@@ -136,13 +136,15 @@
         return;
       }
 
-      // 方位記号の先端(N)をつかんだら回転モード
-      const nm = global.Render.getNorthMark(cssCanvas(), project);
-      const grabR = Math.max(12, 300 * global.Render.view.zoom);
-      if (Math.hypot(p.x - nm.tip.x, p.y - nm.tip.y) <= grabR) {
-        mode = 'north';
-        last = p;
-        return;
+      // 方位記号の先端(N)をつかんだら回転モード(非表示中はつかめない)
+      if (project.meta.showNorthMark) {
+        const nm = global.Render.getNorthMark(cssCanvas(), project);
+        const grabR = Math.max(12, 300 * global.Render.view.zoom);
+        if (Math.hypot(p.x - nm.tip.x, p.y - nm.tip.y) <= grabR) {
+          mode = 'north';
+          last = p;
+          return;
+        }
       }
 
       // 選択中の多角形の頂点をつかんだら、頂点の移動モード

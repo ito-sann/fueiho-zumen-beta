@@ -274,6 +274,7 @@
     $('metaAuthor').value = m.author;
     $('fixNote').value = m.lightingNote || '';
     $('metaFrame').checked = m.showPaperFrame !== false;
+    $('metaNorth').checked = m.showNorthMark === true;
     $('metaFontScale').value = String(m.fontScale || 100);
     $('metaStore').oninput = (e) => m.storeName = e.target.value;
     $('metaAddr').oninput  = (e) => m.address = e.target.value;
@@ -283,6 +284,7 @@
     $('metaPaper').onchange = (e) => { m.paper = e.target.value; draw(); };
     $('metaOrient').onchange= (e) => { m.orientation = e.target.value; draw(); };
     $('metaFrame').onchange = (e) => { m.showPaperFrame = e.target.checked; draw(); };
+    $('metaNorth').onchange = (e) => { m.showNorthMark = e.target.checked; draw(); };
     $('metaFontScale').onchange = (e) => { m.fontScale = parseInt(e.target.value, 10); draw(); };
     // 設備図コメントは凡例に即時反映させるため、入力のたびに再描画する
     $('fixNote').oninput = (e) => { m.lightingNote = e.target.value; draw(); };

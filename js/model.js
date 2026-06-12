@@ -103,6 +103,7 @@
         lightingNote: '', // 照明・音響設備図の凡例に添える自由記入コメント
         showPaperFrame: true, // 用紙枠ガイド(用紙サイズ×縮尺の範囲)を表示するか
         northAngle: 0,        // 方位記号の角度(度)。0 = 真上が北
+        showNorthMark: false, // 方位記号(N)を表示するか。既定は非表示
         fontScale: 100,       // 図面内ラベルの文字サイズ(%)。要素ごとの fontMm が優先
       },
       regions: [],
