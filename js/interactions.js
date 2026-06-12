@@ -54,7 +54,8 @@
     // 上に描かれるもの(設備→備品→区画)を優先
     for (let i = project.fixtures.length - 1; i >= 0; i--) {
       const x = project.fixtures[i];
-      const r = 12 / global.Render.view.zoom;
+      // アイコン実寸(半径220mm)+余裕。縮小表示中でも最低12px分はつかめるようにする
+      const r = Math.max(280, 12 / global.Render.view.zoom);
       if (Math.hypot(wx - x.x, wy - x.y) <= r) return x;
     }
     const fittings = project.fittings || [];
@@ -124,7 +125,8 @@
 
       // 方位記号の先端(N)をつかんだら回転モード
       const nm = global.Render.getNorthMark(cssCanvas(), project);
-      if (Math.hypot(p.x - nm.tip.x, p.y - nm.tip.y) <= 12) {
+      const grabR = Math.max(12, 300 * global.Render.view.zoom);
+      if (Math.hypot(p.x - nm.tip.x, p.y - nm.tip.y) <= grabR) {
         mode = 'north';
         last = p;
         return;

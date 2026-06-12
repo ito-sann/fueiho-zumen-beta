@@ -23,6 +23,12 @@
   function worldToScreen(x, y) {
     return { x: x * view.zoom + view.offsetX, y: y * view.zoom + view.offsetY };
   }
+
+  /* 実寸(mm)を画面pxに変換する。文字や記号の大きさを「図面に対して固定」に
+   * するために使う。ズームしても部屋との比率が変わらず、PDFでも常に同じ大きさになる。 */
+  function wpx(mm) {
+    return mm * view.zoom;
+  }
   function screenToWorld(px, py) {
     return { x: (px - view.offsetX) / view.zoom, y: (py - view.offsetY) / view.zoom };
   }
@@ -130,11 +136,11 @@
     ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : '#333';
     ctx.stroke();
-    // ラベルは重心に置く
+    // ラベルは重心に置く(実寸320mm相当の固定サイズ)
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
     ctx.fillStyle = '#222';
-    ctx.font = '13px sans-serif';
+    ctx.font = `${wpx(320)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText((opts.code ? opts.code + ' ' : '') + r.label, cx, cy);
@@ -161,7 +167,7 @@
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
     ctx.save();
-    ctx.font = '11px sans-serif';
+    ctx.font = `${wpx(240)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (let i = 0; i < pts.length; i++) {
@@ -171,12 +177,12 @@
       const ox = mx - cx, oy = my - cy;
       const d = Math.hypot(ox, oy) || 1;
       ctx.fillStyle = '#1565c0';
-      ctx.fillText(edges[i].toFixed(2) + 'm', mx + (ox / d) * 14, my + (oy / d) * 14);
+      ctx.fillText(edges[i].toFixed(2) + 'm', mx + (ox / d) * wpx(300), my + (oy / d) * wpx(300));
       // 頂点番号は頂点の外側に
       const vx = a.x - cx, vy = a.y - cy;
       const vd = Math.hypot(vx, vy) || 1;
       ctx.fillStyle = '#6a1b9a';
-      ctx.fillText('P' + (i + 1), a.x + (vx / vd) * 12, a.y + (vy / vd) * 12);
+      ctx.fillText('P' + (i + 1), a.x + (vx / vd) * wpx(260), a.y + (vy / vd) * wpx(260));
     }
     ctx.restore();
   }
@@ -229,9 +235,9 @@
     ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : '#333';
     ctx.stroke();
-    // ラベル(符号つき)
+    // ラベル(符号つき)。文字は実寸320mm相当(図面に対して固定サイズ)
     ctx.fillStyle = '#222';
-    ctx.font = '13px sans-serif';
+    ctx.font = `${wpx(320)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const label = (opts.code ? opts.code + ' ' : '') + r.label;
@@ -245,28 +251,28 @@
     const sc = worldToScreen(r.x + r.w / 2, r.y + r.h / 2);
     const w = r.w * view.zoom, h = r.h * view.zoom;
     const shape = r.shape || 'rect';
-    const off = 14;
+    const off = wpx(300); // 寸法線の離れ(実寸300mm相当)
     ctx.save();
     ctx.translate(sc.x, sc.y);
     ctx.rotate((r.rotation || 0) * Math.PI / 180);
     ctx.strokeStyle = '#1565c0';
     ctx.fillStyle = '#1565c0';
     ctx.lineWidth = 1;
-    ctx.font = '11px sans-serif';
+    ctx.font = `${wpx(240)}px sans-serif`;
     ctx.textAlign = 'center';
     // 底辺/幅(下辺の外側)
     const by = h / 2 + off;
     ctx.textBaseline = 'top';
     ctx.beginPath(); ctx.moveTo(-w / 2, by); ctx.lineTo(w / 2, by); ctx.stroke();
     tick(ctx, -w / 2, by); tick(ctx, w / 2, by);
-    ctx.fillText(global.Geometry.fmtM(r.w) + 'm', 0, by + 2);
+    ctx.fillText(global.Geometry.fmtM(r.w) + 'm', 0, by + wpx(50));
     // 高さ/奥行(左辺の外側)
     const wx = -w / 2 - off;
     ctx.textBaseline = 'bottom';
     ctx.beginPath(); ctx.moveTo(wx, -h / 2); ctx.lineTo(wx, h / 2); ctx.stroke();
     tick(ctx, wx, -h / 2); tick(ctx, wx, h / 2);
     ctx.save();
-    ctx.translate(wx - 2, 0);
+    ctx.translate(wx - wpx(50), 0);
     ctx.rotate(-Math.PI / 2);
     ctx.fillText(global.Geometry.fmtM(r.h) + 'm', 0, 0);
     ctx.restore();
@@ -277,12 +283,13 @@
       ctx.textBaseline = 'bottom';
       ctx.beginPath(); ctx.moveTo(-w2 / 2, ty); ctx.lineTo(w2 / 2, ty); ctx.stroke();
       tick(ctx, -w2 / 2, ty); tick(ctx, w2 / 2, ty);
-      ctx.fillText(global.Geometry.fmtM(r.w2 != null ? r.w2 : r.w) + 'm', 0, ty - 2);
+      ctx.fillText(global.Geometry.fmtM(r.w2 != null ? r.w2 : r.w) + 'm', 0, ty - wpx(50));
     }
     ctx.restore();
   }
   function tick(ctx, x, y) {
-    ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x, y + 3); ctx.stroke();
+    const t = wpx(70); // 目盛の長さ(実寸70mm相当)
+    ctx.beginPath(); ctx.moveTo(x, y - t); ctx.lineTo(x, y + t); ctx.stroke();
   }
 
   function drawFurniture(ctx, f, opts) {
@@ -297,9 +304,10 @@
     ctx.lineWidth = opts.selected ? 3 : 1.5;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : (over ? '#c62828' : '#555');
     ctx.strokeRect(-w / 2, -h / 2, w, h);
-    if (Math.min(w, h) > 22) {
+    // ラベルは実寸200mm相当。小さすぎる備品(つい立て等)には描かない
+    if (Math.min(w, h) > wpx(380)) {
       ctx.fillStyle = '#333';
-      ctx.font = '10px sans-serif';
+      ctx.font = `${wpx(200)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(f.label, 0, 0);
@@ -350,10 +358,10 @@
       ctx.stroke();
       arrow(ctx, -w / 2 + 2, 0, w / 2 - 2, 0); // 両矢印
       ctx.fillStyle = line;
-      ctx.font = '10px sans-serif';
+      ctx.font = `${wpx(200)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText('出入口', 0, h / 2 + 2);
+      ctx.fillText('出入口', 0, h / 2 + wpx(50));
     }
     ctx.restore();
   }
@@ -376,7 +384,7 @@
 
   function drawFixture(ctx, x, opts) {
     const p = worldToScreen(x.x, x.y);
-    const r = 10;
+    const r = wpx(220); // アイコン半径(実寸220mm相当・図面に対して固定)
     const sym = (global.Model.FIXTURE_CATALOG[x.kind] || {}).symbol || '?';
     ctx.save();
     ctx.beginPath();
@@ -387,7 +395,7 @@
     ctx.strokeStyle = opts.selected ? '#d32f2f' : '#f9a825';
     ctx.stroke();
     ctx.fillStyle = '#5d4037';
-    ctx.font = 'bold 9px sans-serif';
+    ctx.font = `bold ${wpx(170)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(sym, p.x, p.y);
@@ -406,18 +414,21 @@
       `${g.label} ${g.count}台${g.watt ? `(${g.watt}W)` : ''}`);
     const noteLines = note ? note.split('\n') : [];
     const title = '凡例(照明・音響設備)';
-    const lineH = 17, pad = 9, iconW = 22;
+    // 大きさはすべて実寸基準(図面に対して固定サイズ)
+    const lineH = wpx(380), pad = wpx(200), iconW = wpx(500);
+    const fontN = `${wpx(250)}px sans-serif`;
+    const fontB = `bold ${wpx(250)}px sans-serif`;
 
     ctx.save();
-    ctx.font = '11px sans-serif';
+    ctx.font = fontN;
     let wMax = ctx.measureText(title).width;
     for (const t of rows) wMax = Math.max(wMax, iconW + ctx.measureText(t).width);
     for (const t of noteLines) wMax = Math.max(wMax, ctx.measureText(t).width);
     const w = wMax + pad * 2;
     const lines = 1 + rows.length + noteLines.length;
     const h = pad * 2 + lineH * lines;
-    const x0 = canvas.width - w - 12;
-    const y0 = canvas.height - h - 12;
+    const x0 = canvas.width - w - wpx(280);
+    const y0 = canvas.height - h - wpx(280);
 
     // 枠
     ctx.fillStyle = 'rgba(255,255,255,0.93)';
@@ -428,29 +439,29 @@
 
     // タイトル
     ctx.fillStyle = '#222';
-    ctx.font = 'bold 11px sans-serif';
+    ctx.font = fontB;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     let y = y0 + pad + lineH / 2;
     ctx.fillText(title, x0 + pad, y);
 
     // 設備の行(アイコン + 名称・台数)
-    ctx.font = '11px sans-serif';
+    const iconR = wpx(160);
     for (let i = 0; i < list.length; i++) {
       y += lineH;
-      const cx = x0 + pad + 7, cy = y;
+      const cx = x0 + pad + iconR, cy = y;
       ctx.beginPath();
-      ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+      ctx.arc(cx, cy, iconR, 0, Math.PI * 2);
       ctx.fillStyle = '#fff8e1';
       ctx.fill();
       ctx.strokeStyle = '#f9a825';
       ctx.stroke();
       ctx.fillStyle = '#5d4037';
-      ctx.font = 'bold 7px sans-serif';
+      ctx.font = `bold ${wpx(150)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(list[i].symbol, cx, cy);
       ctx.fillStyle = '#222';
-      ctx.font = '11px sans-serif';
+      ctx.font = fontN;
       ctx.textAlign = 'left';
       ctx.fillText(rows[i], x0 + pad + iconW, y);
     }
@@ -490,39 +501,40 @@
     ctx.setLineDash([10, 6]);
     ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
     ctx.setLineDash([]);
-    // 左上: 用紙の説明
+    // 左上: 用紙の説明(実寸240mm相当の固定サイズ)
     ctx.fillStyle = '#1d4ed8';
-    ctx.font = '11px sans-serif';
+    ctx.font = `${wpx(240)}px sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
     const orient = m.orientation === 'portrait' ? '縦' : '横';
     ctx.fillText(
       `用紙枠 ${m.paper}${orient}(この枠内 = ${(f.w / 1000).toFixed(2)} × ${(f.h / 1000).toFixed(2)} m)`,
-      tl.x, tl.y - 4);
-    // 右下: スケールバー(黒線の長さ = 図面上の1m)と縮尺表示
-    const barLen = 1000 * view.zoom; // 1m分の画面上の長さ
-    const bx2 = br.x - 12, bx1 = bx2 - barLen;
-    const by = br.y - 26; // 下のラベルが枠線にかからない高さ
+      tl.x, tl.y - wpx(90));
+    // 右下: スケールバー(黒線の長さ = 図面上の1m)と縮尺表示。各部も実寸基準
+    const barLen = wpx(1000); // 1m分の画面上の長さ
+    const bx2 = br.x - wpx(280), bx1 = bx2 - barLen;
+    const by = br.y - wpx(620); // 下のラベルが枠線にかからない高さ
     ctx.strokeStyle = '#111';
     ctx.fillStyle = '#111';
     ctx.lineWidth = 2;
     // 本体の線
     ctx.beginPath(); ctx.moveTo(bx1, by); ctx.lineTo(bx2, by); ctx.stroke();
     // 両端の目盛(縦線)と中央(0.5m)の小さい目盛
+    const tk = wpx(130), tkS = wpx(65);
     ctx.beginPath();
-    ctx.moveTo(bx1, by - 6); ctx.lineTo(bx1, by + 6);
-    ctx.moveTo(bx2, by - 6); ctx.lineTo(bx2, by + 6);
-    ctx.moveTo((bx1 + bx2) / 2, by - 3); ctx.lineTo((bx1 + bx2) / 2, by + 3);
+    ctx.moveTo(bx1, by - tk); ctx.lineTo(bx1, by + tk);
+    ctx.moveTo(bx2, by - tk); ctx.lineTo(bx2, by + tk);
+    ctx.moveTo((bx1 + bx2) / 2, by - tkS); ctx.lineTo((bx1 + bx2) / 2, by + tkS);
     ctx.stroke();
     // ラベル: 線の両端に 0 / 1m、上に縮尺
-    ctx.font = 'bold 11px sans-serif';
+    ctx.font = `bold ${wpx(240)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText('0', bx1, by + 8);
-    ctx.fillText('1m', bx2, by + 8);
+    ctx.fillText('0', bx1, by + wpx(180));
+    ctx.fillText('1m', bx2, by + wpx(180));
     ctx.textAlign = 'right';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`縮尺 1/${m.scale}`, bx2, by - 8);
+    ctx.fillText(`縮尺 1/${m.scale}`, bx2, by - wpx(180));
     ctx.restore();
   }
 
@@ -532,18 +544,20 @@
     if (project.meta.showPaperFrame) {
       const f = paperFrameWorld(project);
       const s = worldToScreen(f.x + f.w, f.y);
-      return { x: s.x - 40, y: s.y + 48 };
+      return { x: s.x - wpx(950), y: s.y + wpx(1100) };
     }
     return { x: canvas.width - 40, y: 46 };
   }
 
-  /* 方位記号の形状(中心・半径・Nの先端位置)。当たり判定にも使う。 */
+  /* 方位記号の形状(中心・半径・Nの先端位置)。当たり判定にも使う。
+   * 大きさは実寸基準(半径400mm相当)で、図面に対して固定サイズ。 */
   function getNorthMark(canvas, project) {
     const c = northMarkCenter(canvas, project);
-    const r = 18;
+    const r = wpx(400);
     const a = (project.meta.northAngle || 0) * Math.PI / 180;
-    // 角度0で真上。先端は円の外側(r+10)あたり。
-    const tip = { x: c.x + Math.sin(a) * (r + 10), y: c.y - Math.cos(a) * (r + 10) };
+    // 角度0で真上。先端は円の外側(r+220mm相当)あたり。
+    const tipR = r + wpx(220);
+    const tip = { x: c.x + Math.sin(a) * tipR, y: c.y - Math.cos(a) * tipR };
     return { cx: c.x, cy: c.y, r, tip, angle: a };
   }
 
@@ -554,22 +568,23 @@
     ctx.save();
     ctx.strokeStyle = '#333'; ctx.fillStyle = '#333'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-    // 矢印(角度に追従して回転)
+    // 矢印(角度に追従して回転。各部は半径に比例)
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(n.angle);
     ctx.beginPath();
-    ctx.moveTo(0, -r - 6);
-    ctx.lineTo(-6, 4);
-    ctx.lineTo(0, -2);
-    ctx.lineTo(6, 4);
+    ctx.moveTo(0, -r * 1.33);
+    ctx.lineTo(-r * 0.33, r * 0.22);
+    ctx.lineTo(0, -r * 0.11);
+    ctx.lineTo(r * 0.33, r * 0.22);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
     // N の文字は先端の少し外側(文字自体は回転させず読みやすく)
-    const lx = cx + Math.sin(n.angle) * (r + 16);
-    const ly = cy - Math.cos(n.angle) * (r + 16);
-    ctx.font = 'bold 12px sans-serif';
+    const lr = r + wpx(380);
+    const lx = cx + Math.sin(n.angle) * lr;
+    const ly = cy - Math.cos(n.angle) * lr;
+    ctx.font = `bold ${wpx(280)}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('N', lx, ly);
     ctx.restore();
