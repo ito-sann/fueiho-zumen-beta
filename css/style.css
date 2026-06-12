@@ -93,7 +93,14 @@ table.summary td { text-align: right; font-weight: 700; padding: 4px 2px; }
 .props .prop-row b { color: #1f2937; }
 .props .btn { margin-top: 8px; width: 100%; }
 
-.kyuseki-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; color: #374151; }
+/* 多角形の頂点編集(P1: X / Y を横並びで) */
+.props .vertex-row { gap: 4px; }
+.props .vertex-row span { flex: 0 0 28px; }
+.props .vertex-row input { width: 50%; min-width: 0; }
+
+.kyuseki-title { font-size: 12px; font-weight: 600; margin: 10px 0 6px; color: #374151; }
+table.kyuseki.coord { font-size: 11px; }
+table.kyuseki.coord td, table.kyuseki.coord th { padding: 3px 4px; }
 table.kyuseki { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.kyuseki th, table.kyuseki td { border: 1px solid #e2e8f0; padding: 4px 6px; text-align: left; }
 table.kyuseki thead th { background: #f8fafc; }

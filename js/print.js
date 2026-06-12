@@ -34,15 +34,39 @@
       </table>`;
   }
 
+  /* 多角形の座標求積表(頂点番号は図面の P1, P2 … と対応) */
+  function coordTablesHtml(project, filterTypes) {
+    const polys = project.regions.filter((r) => r.shape === 'polygon' &&
+      (!filterTypes || filterTypes.indexOf(r.type) >= 0));
+    return polys.map((r) => {
+      const c = global.Geometry.polygonCalc(r);
+      const rows = c.rows.map((row) =>
+        `<tr><td>P${row.no}</td><td class="num">${row.x.toFixed(2)}</td><td class="num">${row.y.toFixed(2)}</td>
+         <td class="num">${row.dy.toFixed(2)}</td><td class="num">${row.prod.toFixed(4)}</td></tr>`).join('');
+      return `
+      <table class="kyuseki">
+        <caption>座標求積表(${escapeHtml(r.label)})</caption>
+        <thead><tr><th>点</th><th>X(m)</th><th>Y(m)</th><th>Y次−Y前</th><th>X×(Y次−Y前)</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr><td colspan="4">倍面積</td><td class="num">${c.doubleArea.toFixed(4)}</td></tr>
+          <tr><td colspan="4">面積(倍面積÷2)</td><td class="num">${c.area4.toFixed(4)} ㎡</td></tr>
+        </tfoot>
+      </table>`;
+    }).join('');
+  }
+
   /* レイヤーに応じた添付表のHTML */
   function tablesForLayer(project, layer) {
     const vis = global.Render.visibility(layer);
     if (vis.table === 'all') {
-      return tableHtml('営業所求積表', global.Geometry.buildTable(project, null));
+      return tableHtml('営業所求積表', global.Geometry.buildTable(project, null)) +
+             coordTablesHtml(project, null);
     }
     if (vis.table === 'kyakuchubo') {
       return tableHtml('客室求積表', global.Geometry.buildTable(project, ['kyakushitsu'])) +
-             tableHtml('調理場求積表', global.Geometry.buildTable(project, ['chubo']));
+             tableHtml('調理場求積表', global.Geometry.buildTable(project, ['chubo'])) +
+             coordTablesHtml(project, ['kyakushitsu', 'chubo']);
     }
     if (vis.table === 'fixtures') {
       return fixtureTableHtml(project);

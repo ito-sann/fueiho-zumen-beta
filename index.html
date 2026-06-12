@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.2.0">
+  <link rel="stylesheet" href="css/style.css?v=1.3.0">
 </head>
 <body>
   <header class="topbar">
@@ -50,6 +50,8 @@
         <div class="size-row" id="regionW2Row" style="display:none">
           <label>上底(台形) <input type="number" id="regionW2" value="1600" step="100"> mm</label>
         </div>
+        <button id="btnDrawPoly" class="btn block">多角形で描く</button>
+        <p class="muted">L字や斜め壁など自由な形は、キャンバス上で角をクリックして囲います(面積は座標法で自動計算)。</p>
       </section>
 
       <section class="group">
@@ -115,7 +117,7 @@
     <!-- 中央:キャンバス -->
     <section class="canvas-wrap">
       <canvas id="canvas"></canvas>
-      <div class="hint">空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(既定1cm吸着・Shiftで自由)/ 矢印キーで微調整(Shiftで10倍)/ Deleteで削除</div>
+      <div class="hint" id="hint">空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(既定1cm吸着・Shiftで自由)/ 矢印キーで微調整(Shiftで10倍)/ Deleteで削除</div>
     </section>
 
     <!-- 右:プロパティ・面積・注意 -->
@@ -156,12 +158,12 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.2.0"></script>
-  <script src="js/geometry.js?v=1.2.0"></script>
-  <script src="js/render.js?v=1.2.0"></script>
-  <script src="js/interactions.js?v=1.2.0"></script>
-  <script src="js/print.js?v=1.2.0"></script>
-  <script src="js/forms.js?v=1.2.0"></script>
-  <script src="js/main.js?v=1.2.0"></script>
+  <script src="js/model.js?v=1.3.0"></script>
+  <script src="js/geometry.js?v=1.3.0"></script>
+  <script src="js/render.js?v=1.3.0"></script>
+  <script src="js/interactions.js?v=1.3.0"></script>
+  <script src="js/print.js?v=1.3.0"></script>
+  <script src="js/forms.js?v=1.3.0"></script>
+  <script src="js/main.js?v=1.3.0"></script>
 </body>
 </html>

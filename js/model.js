@@ -140,6 +140,47 @@
     return region;
   }
 
+  /* 多角形の区画を追加する。pointsAbs は絶対座標(mm)の頂点列(3点以上)。
+   * 内部では「左上を原点(x,y)とした相対座標」で持ち、移動は x,y だけ動かす。 */
+  function addPolygonRegion(project, type, pointsAbs) {
+    const number = nextRegionNumber(project, type);
+    const t = REGION_TYPES[type];
+    const minX = Math.min(...pointsAbs.map((p) => p.x));
+    const minY = Math.min(...pointsAbs.map((p) => p.y));
+    const region = {
+      id: nextId(project, 'r'),
+      type,
+      number,
+      label: type === 'kyakushitsu' ? `客室${number}` : t.label,
+      x: minX,
+      y: minY,
+      w: 0,
+      h: 0,
+      shape: 'polygon',
+      points: pointsAbs.map((p) => ({ x: p.x - minX, y: p.y - minY })),
+      rotation: 0,
+      color: t.color,
+    };
+    normalizePolygon(region);
+    project.regions.push(region);
+    return region;
+  }
+
+  /* 多角形の原点(x,y)を頂点の最小値に合わせ直し、w/h(外接サイズ)を更新する。
+   * 頂点編集後に呼ぶことで、当たり判定・全体表示が正しく働く。 */
+  function normalizePolygon(region) {
+    if (region.shape !== 'polygon' || !region.points || !region.points.length) return;
+    const minX = Math.min(...region.points.map((p) => p.x));
+    const minY = Math.min(...region.points.map((p) => p.y));
+    if (minX !== 0 || minY !== 0) {
+      region.x += minX;
+      region.y += minY;
+      for (const p of region.points) { p.x -= minX; p.y -= minY; }
+    }
+    region.w = Math.max(...region.points.map((p) => p.x));
+    region.h = Math.max(...region.points.map((p) => p.y));
+  }
+
   function addFurniture(project, kind) {
     const c = FURNITURE_CATALOG[kind];
     const item = {
@@ -232,7 +273,8 @@
     REGION_TYPES, FURNITURE_CATALOG, FITTING_CATALOG, FIXTURE_CATALOG, PAPER_SIZES,
     SIGHTLINE_LIMIT, CHECKLIST_ITEMS,
     todayStr, defaultProject, nextId, nextRegionNumber,
-    addRegion, addFurniture, addFitting, addFixture, removeById, findById,
+    addRegion, addPolygonRegion, normalizePolygon,
+    addFurniture, addFitting, addFixture, removeById, findById,
     serialize, deserialize,
   };
 })(window);

@@ -28,16 +28,61 @@
     return `(${n})`;
   }
 
+  /* 多角形の頂点を m(小数第2位=cm 単位)に変換した配列を返す。
+   * 座標求積表の表示値と面積計算を一致させるため、必ず丸めた値を使う。 */
+  function polygonPointsM(region) {
+    return (region.points || []).map((p) => ({ x: mmToM(p.x), y: mmToM(p.y) }));
+  }
+
+  /* 座標法(測量と同じ計算)による多角形の求積。
+   *   倍面積 = Σ Xi × (Y(i+1) − Y(i−1))   → 面積 = |倍面積| ÷ 2
+   * 行データ(座標求積表)と面積(第4位)を返す。 */
+  function polygonCalc(region) {
+    const pts = polygonPointsM(region);
+    const n = pts.length;
+    const rows = [];
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      const prev = pts[(i - 1 + n) % n];
+      const next = pts[(i + 1) % n];
+      const dy = round4(next.y - prev.y);
+      const prod = round4(pts[i].x * dy);
+      sum += prod;
+      rows.push({ no: i + 1, x: pts[i].x, y: pts[i].y, dy, prod });
+    }
+    const doubleArea = round4(Math.abs(sum));
+    return { rows, doubleArea, area4: round4(doubleArea / 2) };
+  }
+
+  /* 多角形の各辺の長さ(m・第2位)。図面の辺長表示に使う。 */
+  function polygonEdgesM(region) {
+    const pts = polygonPointsM(region);
+    const n = pts.length;
+    const edges = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      edges.push(round2(Math.hypot(b.x - a.x, b.y - a.y)));
+    }
+    return edges;
+  }
+
   /* 1区画の求積計算(形ごと)
    *   長方形 : 幅 × 奥行
    *   三角形 : 底辺 × 高さ ÷ 2
    *   台形   : (上底 + 下底) × 高さ ÷ 2
+   *   多角形 : 座標法(倍面積÷2)
    * いずれも面積は第4位まで。 */
   function regionCalc(region) {
     const wM = mmToM(region.w);
     const hM = mmToM(region.h);
     const shape = region.shape || 'rect';
     let area4, expr;
+    if (shape === 'polygon') {
+      const c = polygonCalc(region);
+      area4 = c.area4;
+      expr = `座標法(${(region.points || []).length}点)`;
+      return { wM, hM, area4, expr, shape };
+    }
     if (shape === 'triangle') {
       area4 = round4(wM * hM / 2);
       expr = `${wM.toFixed(2)} × ${hM.toFixed(2)} ÷ 2`;
@@ -171,6 +216,7 @@
 
   global.Geometry = {
     mmToM, fmtM, code, regionCalc, regionAreaSqm, regionRow, buildTable,
+    polygonCalc, polygonEdgesM, polygonPointsM,
     summary, sightlineWarnings, kyakushitsuSizeWarnings, KYAKUSHITSU_MIN_SQM,
     fixtureSummary, boundingBox,
   };

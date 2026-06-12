@@ -105,6 +105,24 @@
     $('regionShape').onchange = (e) => {
       $('regionW2Row').style.display = e.target.value === 'trapezoid' ? '' : 'none';
     };
+    // 多角形の作図モード(クリックで頂点を置いて囲う)。もう一度押すと中止。
+    $('btnDrawPoly').onclick = () => {
+      if (state.draft) {
+        I.cancelPolygon(state);
+        setDraftUi(false);
+        draw();
+        return;
+      }
+      const type = $('regionType').value;
+      I.beginPolygon(state, (pts) => {
+        const r = M.addPolygonRegion(project, type, pts);
+        state.selectedId = r.id;
+        setDraftUi(false);
+        refresh(); showProps(r);
+      });
+      setDraftUi(true);
+      draw();
+    };
     $('btnAddFurn').onclick = () => {
       const f = M.addFurniture(project, $('furnKind').value);
       placeAtViewCenter(f);
@@ -182,6 +200,15 @@
     });
   }
 
+  /* 作図モード中のボタン表示とヒント文を切り替える */
+  const HINT_DEFAULT = '空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(既定1cm吸着・Shiftで自由)/ 矢印キーで微調整(Shiftで10倍)/ Deleteで削除';
+  const HINT_DRAFT = '多角形の作図中: クリックで角を置く / 最初の点をクリック・ダブルクリック・Enterで確定 / Escで中止';
+  function setDraftUi(drafting) {
+    $('btnDrawPoly').textContent = drafting ? '作図を中止(Esc)' : '多角形で描く';
+    $('btnDrawPoly').classList.toggle('danger', drafting);
+    $('hint').textContent = drafting ? HINT_DRAFT : HINT_DEFAULT;
+  }
+
   function clampSize(v) {
     let n = parseInt(v, 10);
     if (!isFinite(n) || n < 100) n = 100;
@@ -235,6 +262,7 @@
   /* ---- 描画と再計算 ---- */
   function draw() {
     R.render(ctx, canvasCss(), project, state);
+    setDraftUi(!!state.draft); // Escで中止された場合もボタン・ヒントを戻す
   }
   function refresh() {
     draw();
@@ -280,17 +308,45 @@
       </table>`;
   }
 
+  /* 多角形1つ分の座標求積表(頂点番号は図面の P1, P2 … と対応) */
+  function coordTableHtml(r) {
+    const c = G.polygonCalc(r);
+    const rows = c.rows.map((row) =>
+      `<tr><td>P${row.no}</td><td>${row.x.toFixed(2)}</td><td>${row.y.toFixed(2)}</td>
+       <td>${row.dy.toFixed(2)}</td><td>${row.prod.toFixed(4)}</td></tr>`).join('');
+    return `
+      <div class="kyuseki-title">座標求積表(${esc(r.label)})</div>
+      <table class="kyuseki coord">
+        <thead><tr><th>点</th><th>X(m)</th><th>Y(m)</th><th>Y次−Y前</th><th>X×(Y次−Y前)</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr><td colspan="4">倍面積</td><td>${c.doubleArea.toFixed(4)}</td></tr>
+          <tr><td colspan="4">面積(倍面積÷2)</td><td>${c.area4.toFixed(4)} ㎡</td></tr>
+        </tfoot>
+      </table>`;
+  }
+
+  /* 指定の種類に含まれる多角形すべての座標求積表 */
+  function coordTablesHtml(filterTypes) {
+    return project.regions
+      .filter((r) => r.shape === 'polygon' &&
+        (!filterTypes || filterTypes.indexOf(r.type) >= 0))
+      .map(coordTableHtml).join('');
+  }
+
   function renderKyuseki() {
     const layer = R.getLayer();
     let html;
     if (layer === 'kyakushitsu') {
       // 客室・調理場求積図: 客室と調理場の求積表を別々に出す
       html = kyusekiTableHtml('客室求積表', G.buildTable(project, ['kyakushitsu'])) +
-             kyusekiTableHtml('調理場求積表', G.buildTable(project, ['chubo']));
+             kyusekiTableHtml('調理場求積表', G.buildTable(project, ['chubo'])) +
+             coordTablesHtml(['kyakushitsu', 'chubo']);
     } else if (layer === 'lighting') {
       html = fixtureTableHtml();
     } else {
-      html = kyusekiTableHtml('営業所求積表', G.buildTable(project, null));
+      html = kyusekiTableHtml('営業所求積表', G.buildTable(project, null)) +
+             coordTablesHtml(null);
     }
     $('kyusekiBox').innerHTML = html;
   }
@@ -362,15 +418,25 @@
     }
     if (kind === 'regions') {
       const shape = el.shape || 'rect';
-      const wLabel = shape === 'rect' ? '幅(mm)' : shape === 'triangle' ? '底辺(mm)' : '下底(mm)';
-      const hLabel = shape === 'rect' ? '奥行(mm)' : '高さ(mm)';
       html += `<div class="prop-row"><span>形</span><b>${shapeLabel(shape)}</b></div>`;
-      html += propNum(wLabel, 'w', el.w);
-      if (shape === 'trapezoid') {
-        html += propNum('上底(mm)', 'w2', el.w2 != null ? el.w2 : el.w);
+      if (shape === 'polygon') {
+        // 頂点の座標(絶対mm)を1点ずつ編集できる。キャンバス上のドラッグでも修正可。
+        html += '<p class="muted">頂点はキャンバス上でドラッグでも動かせます。</p>';
+        el.points.forEach((p, i) => {
+          html += `<div class="prop-row vertex-row"><span>P${i + 1}</span>
+            <input type="number" step="10" data-vx="${i}" value="${el.x + p.x}" title="X(mm)">
+            <input type="number" step="10" data-vy="${i}" value="${el.y + p.y}" title="Y(mm)"></div>`;
+        });
+      } else {
+        const wLabel = shape === 'rect' ? '幅(mm)' : shape === 'triangle' ? '底辺(mm)' : '下底(mm)';
+        const hLabel = shape === 'rect' ? '奥行(mm)' : '高さ(mm)';
+        html += propNum(wLabel, 'w', el.w);
+        if (shape === 'trapezoid') {
+          html += propNum('上底(mm)', 'w2', el.w2 != null ? el.w2 : el.w);
+        }
+        html += propNum(hLabel, 'h', el.h);
+        html += propNum('角度(度)', 'rotation', el.rotation || 0);
       }
-      html += propNum(hLabel, 'h', el.h);
-      html += propNum('角度(度)', 'rotation', el.rotation || 0);
       const area = G.regionAreaSqm(el);
       html += `<div class="prop-row"><span>面積</span><b id="propArea">${area.toFixed(4)} ㎡</b></div>`;
     }
@@ -389,6 +455,18 @@
         if (areaEl) areaEl.textContent = G.regionAreaSqm(el).toFixed(4) + ' ㎡';
       });
     });
+    // 多角形の頂点座標の編集(原点の取り直しがあるため change で確定時に反映)
+    box.querySelectorAll('[data-vx], [data-vy]').forEach((inp) => {
+      inp.addEventListener('change', (e) => {
+        const isX = 'vx' in e.target.dataset;
+        const i = parseInt(isX ? e.target.dataset.vx : e.target.dataset.vy, 10);
+        const v = parseFloat(e.target.value) || 0;
+        if (isX) el.points[i].x = v - el.x;
+        else el.points[i].y = v - el.y;
+        M.normalizePolygon(el);
+        refresh(); showProps(el);
+      });
+    });
     $('btnDel').onclick = () => {
       M.removeById(project, el.id);
       state.selectedId = null;
@@ -397,7 +475,7 @@
   }
 
   function shapeLabel(shape) {
-    return { rect: '長方形', triangle: '三角形', trapezoid: '台形' }[shape] || '長方形';
+    return { rect: '長方形', triangle: '三角形', trapezoid: '台形', polygon: '多角形' }[shape] || '長方形';
   }
 
   function kindLabel(el, kind) {

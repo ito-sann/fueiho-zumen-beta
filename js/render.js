@@ -100,7 +100,111 @@
     ctx.closePath();
   }
 
+  /* 多角形区画の頂点を画面座標で返す */
+  function polygonScreenPts(r) {
+    return (r.points || []).map((p) => worldToScreen(r.x + p.x, r.y + p.y));
+  }
+
+  /* 多角形区画を描く(塗り・輪郭・ラベル・選択時は頂点ハンドル) */
+  function drawPolygonRegion(ctx, r, opts) {
+    const pts = polygonScreenPts(r);
+    if (pts.length < 3) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    if (opts.fill) {
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = r.color;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.lineWidth = opts.selected ? 3 : 2;
+    ctx.strokeStyle = opts.selected ? '#d32f2f' : '#333';
+    ctx.stroke();
+    // ラベルは重心に置く
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    ctx.fillStyle = '#222';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText((opts.code ? opts.code + ' ' : '') + r.label, cx, cy);
+    // 選択中は頂点ハンドル(ドラッグで形を修正できる)
+    if (opts.selected) {
+      for (const p of pts) {
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#d32f2f';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(p.x - 4, p.y - 4, 8, 8);
+        ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  /* 多角形の寸法表示: 各辺の長さ(m)と頂点番号(P1, P2 …)。
+   * 頂点番号は座標求積表の「点」列と対応する。 */
+  function drawPolygonDims(ctx, r) {
+    const pts = polygonScreenPts(r);
+    if (pts.length < 3) return;
+    const edges = global.Geometry.polygonEdgesM(r);
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    ctx.save();
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      // 辺の中点から重心の反対側(外側)に少し離して辺長を書く
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const ox = mx - cx, oy = my - cy;
+      const d = Math.hypot(ox, oy) || 1;
+      ctx.fillStyle = '#1565c0';
+      ctx.fillText(edges[i].toFixed(2) + 'm', mx + (ox / d) * 14, my + (oy / d) * 14);
+      // 頂点番号は頂点の外側に
+      const vx = a.x - cx, vy = a.y - cy;
+      const vd = Math.hypot(vx, vy) || 1;
+      ctx.fillStyle = '#6a1b9a';
+      ctx.fillText('P' + (i + 1), a.x + (vx / vd) * 12, a.y + (vy / vd) * 12);
+    }
+    ctx.restore();
+  }
+
+  /* 作図中の多角形(下書き)を描く */
+  function drawDraft(ctx, draft) {
+    const pts = draft.points.map((p) => worldToScreen(p.x, p.y));
+    if (!pts.length) return;
+    ctx.save();
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    if (draft.cursor) {
+      const c = worldToScreen(draft.cursor.x, draft.cursor.y);
+      ctx.lineTo(c.x, c.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // 置いた頂点(最初の点は閉じる目印として大きめ)
+    pts.forEach((p, i) => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, i === 0 ? 6 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = i === 0 ? '#fff' : '#2563eb';
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 2;
+      ctx.fill(); ctx.stroke();
+    });
+    ctx.restore();
+  }
+
   function drawRegion(ctx, r, opts) {
+    if (r.shape === 'polygon') { drawPolygonRegion(ctx, r, opts); return; }
     const sc = worldToScreen(r.x + r.w / 2, r.y + r.h / 2); // 中心
     const w = r.w * view.zoom, h = r.h * view.zoom;
     const w2 = (r.w2 != null ? r.w2 : r.w) * view.zoom;
@@ -130,6 +234,7 @@
 
   /* 寸法線(底辺=下、高さ=左、台形は上底=上)。区画の回転に追従する。 */
   function drawDimension(ctx, r) {
+    if (r.shape === 'polygon') { drawPolygonDims(ctx, r); return; }
     const sc = worldToScreen(r.x + r.w / 2, r.y + r.h / 2);
     const w = r.w * view.zoom, h = r.h * view.zoom;
     const shape = r.shape || 'rect';
@@ -358,6 +463,10 @@
       for (const x of project.fixtures) {
         drawFixture(ctx, x, { selected: state.selectedId === x.id });
       }
+    }
+    // 多角形の作図中なら下書きを最前面に描く
+    if (state.draft && state.draft.points) {
+      drawDraft(ctx, state.draft);
     }
     drawNorthMark(ctx, canvas);
   }

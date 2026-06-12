@@ -10,6 +10,36 @@
   function getSnap() { return snapMm; }
   function snap(v) { return Math.round(v / snapMm) * snapMm; }
 
+  /* 多角形の内側判定(レイキャスティング法)。座標は絶対mm。 */
+  function inPolygon(wx, wy, region) {
+    const pts = region.points || [];
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const xi = region.x + pts[i].x, yi = region.y + pts[i].y;
+      const xj = region.x + pts[j].x, yj = region.y + pts[j].y;
+      if ((yi > wy) !== (yj > wy) &&
+          wx < (xj - xi) * (wy - yi) / (yj - yi) + xi) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  /* 多角形の作図を開始する。クリックで頂点を置き、最初の点をクリック
+   * (またはダブルクリック / Enter)で確定、Esc で中止。
+   * 確定すると onDone(絶対mm座標の頂点列) が呼ばれる。 */
+  function beginPolygon(state, onDone) {
+    state.draft = { points: [], cursor: null, onDone };
+  }
+  function cancelPolygon(state) {
+    state.draft = null;
+  }
+  function finishDraft(state) {
+    const d = state.draft;
+    state.draft = null;
+    if (d && d.points.length >= 3) d.onDone(d.points);
+  }
+
   /* 回転した長方形の内側判定。要素の中心まわりに -rotation だけ戻して矩形判定する。 */
   function inRotatedRect(wx, wy, el) {
     const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
@@ -35,25 +65,68 @@
       if (inRotatedRect(wx, wy, project.furniture[i])) return project.furniture[i];
     }
     for (let i = project.regions.length - 1; i >= 0; i--) {
-      if (inRotatedRect(wx, wy, project.regions[i])) return project.regions[i];
+      const r = project.regions[i];
+      const hit = r.shape === 'polygon' ? inPolygon(wx, wy, r) : inRotatedRect(wx, wy, r);
+      if (hit) return r;
     }
     return null;
   }
 
   function attach(canvas, ctx, project, state, onChange, onSelect) {
-    let mode = null; // 'drag' | 'pan'
+    let mode = null; // 'drag' | 'pan' | 'vertex'
     let last = null; // 直前のマウス位置(画面px)
     let dragTarget = null;
     let grabOffset = { x: 0, y: 0 }; // 要素原点とカーソルの差(mm)
+    let vertexIndex = -1; // 頂点ドラッグ中の頂点番号
 
     function pos(e) {
       const rect = canvas.getBoundingClientRect();
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
 
+    /* 選択中の多角形の頂点のうち、画面上で近い(8px以内)ものを探す */
+    function findVertexAt(p) {
+      if (!state.selectedId) return null;
+      const found = global.Model.findById(project, state.selectedId);
+      if (!found || found.kind !== 'regions' || found.element.shape !== 'polygon') return null;
+      const r = found.element;
+      for (let i = 0; i < r.points.length; i++) {
+        const s = global.Render.worldToScreen(r.x + r.points[i].x, r.y + r.points[i].y);
+        if (Math.hypot(p.x - s.x, p.y - s.y) <= 8) return { region: r, index: i };
+      }
+      return null;
+    }
+
     canvas.addEventListener('mousedown', (e) => {
       const p = pos(e);
       const w = global.Render.screenToWorld(p.x, p.y);
+
+      // 多角形の作図中: クリックで頂点を置く。最初の点の近く(10px)なら閉じて確定。
+      if (state.draft) {
+        const pts = state.draft.points;
+        if (pts.length >= 3) {
+          const first = global.Render.worldToScreen(pts[0].x, pts[0].y);
+          if (Math.hypot(p.x - first.x, p.y - first.y) <= 10) {
+            finishDraft(state);
+            onChange();
+            return;
+          }
+        }
+        pts.push({ x: snap(w.x), y: snap(w.y) });
+        onChange();
+        return;
+      }
+
+      // 選択中の多角形の頂点をつかんだら、頂点の移動モード
+      const v = findVertexAt(p);
+      if (v) {
+        mode = 'vertex';
+        dragTarget = v.region;
+        vertexIndex = v.index;
+        last = p;
+        return;
+      }
+
       const hit = hitTest(project, w.x, w.y);
       if (hit) {
         mode = 'drag';
@@ -72,9 +145,26 @@
     });
 
     window.addEventListener('mousemove', (e) => {
+      const p0 = pos(e);
+      // 作図中はカーソル位置までのプレビュー線を更新する
+      if (state.draft) {
+        const w = global.Render.screenToWorld(p0.x, p0.y);
+        state.draft.cursor = { x: snap(w.x), y: snap(w.y) };
+        onChange();
+        return;
+      }
       if (!mode) return;
-      const p = pos(e);
-      if (mode === 'pan') {
+      const p = p0;
+      if (mode === 'vertex' && dragTarget) {
+        // 頂点を動かして形を修正する(スナップあり・Shiftで自由)
+        const w = global.Render.screenToWorld(p.x, p.y);
+        let nx = w.x, ny = w.y;
+        if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); }
+        dragTarget.points[vertexIndex] = { x: nx - dragTarget.x, y: ny - dragTarget.y };
+        global.Model.normalizePolygon(dragTarget);
+        onChange();
+        onSelect(dragTarget);
+      } else if (mode === 'pan') {
         global.Render.view.offsetX += p.x - last.x;
         global.Render.view.offsetY += p.y - last.y;
         onChange();
@@ -92,7 +182,15 @@
     });
 
     window.addEventListener('mouseup', () => {
-      mode = null; dragTarget = null;
+      mode = null; dragTarget = null; vertexIndex = -1;
+    });
+
+    // ダブルクリックでも多角形を確定できる(3点以上)
+    canvas.addEventListener('dblclick', () => {
+      if (state.draft && state.draft.points.length >= 3) {
+        finishDraft(state);
+        onChange();
+      }
     });
 
     canvas.addEventListener('wheel', (e) => {
@@ -114,6 +212,17 @@
     window.addEventListener('keydown', (e) => {
       const tag = (e.target.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      // 作図中: Enter で確定 / Esc で中止
+      if (state.draft) {
+        if (e.key === 'Enter' && state.draft.points.length >= 3) {
+          finishDraft(state);
+          onChange();
+        } else if (e.key === 'Escape') {
+          cancelPolygon(state);
+          onChange();
+        }
+        return;
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedId) {
         global.Model.removeById(project, state.selectedId);
         state.selectedId = null;
@@ -135,5 +244,5 @@
     });
   }
 
-  global.Interactions = { attach, snap, setSnap, getSnap, hitTest };
+  global.Interactions = { attach, snap, setSnap, getSnap, hitTest, beginPolygon, cancelPolygon };
 })(window);
