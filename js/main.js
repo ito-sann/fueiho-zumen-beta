@@ -96,6 +96,7 @@
       const w = clampSize($('regionW').value);
       const h = clampSize($('regionH').value);
       const w2 = shape === 'trapezoid' ? clampSize($('regionW2').value) : undefined;
+      ensureRegionVisible(type); // 今のレイヤーで見えない種類なら平面図へ切り替え
       const r = M.addRegion(project, type, w, h, shape, w2);
       placeAtViewCenter(r);
       state.selectedId = r.id;
@@ -105,22 +106,22 @@
     $('regionShape').onchange = (e) => {
       $('regionW2Row').style.display = e.target.value === 'trapezoid' ? '' : 'none';
     };
-    // 多角形の作図モード(クリックで頂点を置いて囲う)。もう一度押すと中止。
+    // 多角形の作図モード(クリックで頂点を置いて囲う)。
+    // 作図中にもう一度押すと: 3点以上なら確定、未満なら中止。
     $('btnDrawPoly').onclick = () => {
       if (state.draft) {
-        I.cancelPolygon(state);
-        setDraftUi(false);
+        if (state.draft.points.length >= 3) I.finishPolygon(state);
+        else I.cancelPolygon(state);
         draw();
         return;
       }
       const type = $('regionType').value;
+      ensureRegionVisible(type); // 今のレイヤーで見えない種類なら平面図へ切り替え
       I.beginPolygon(state, (pts) => {
         const r = M.addPolygonRegion(project, type, pts);
         state.selectedId = r.id;
-        setDraftUi(false);
         refresh(); showProps(r);
       });
-      setDraftUi(true);
       draw();
     };
     $('btnAddFurn').onclick = () => {
@@ -203,10 +204,30 @@
   /* 作図モード中のボタン表示とヒント文を切り替える */
   const HINT_DEFAULT = '空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(既定1cm吸着・Shiftで自由)/ 矢印キーで微調整(Shiftで10倍)/ Deleteで削除';
   const HINT_DRAFT = '多角形の作図中: クリックで角を置く / 最初の点をクリック・ダブルクリック・Enterで確定 / Escで中止';
-  function setDraftUi(drafting) {
-    $('btnDrawPoly').textContent = drafting ? '作図を中止(Esc)' : '多角形で描く';
-    $('btnDrawPoly').classList.toggle('danger', drafting);
-    $('hint').textContent = drafting ? HINT_DRAFT : HINT_DEFAULT;
+  function setDraftUi(draft) {
+    const btn = $('btnDrawPoly');
+    if (!draft) {
+      btn.textContent = '多角形で描く';
+      btn.classList.remove('danger');
+      $('hint').textContent = HINT_DEFAULT;
+    } else if (draft.points.length >= 3) {
+      btn.textContent = '作図を確定';
+      btn.classList.remove('danger');
+      $('hint').textContent = HINT_DRAFT;
+    } else {
+      btn.textContent = '作図を中止(Esc)';
+      btn.classList.add('danger');
+      $('hint').textContent = HINT_DRAFT;
+    }
+  }
+
+  /* 区画の種類が今のレイヤーで非表示なら、平面図に切り替えて見えるようにする */
+  function ensureRegionVisible(type) {
+    const vis = R.visibility(R.getLayer());
+    if (!vis.allRegions && vis.regionTypes && vis.regionTypes.indexOf(type) < 0) {
+      R.setLayer('plan');
+      buildLayerTabs();
+    }
   }
 
   function clampSize(v) {
@@ -268,7 +289,7 @@
   /* ---- 描画と再計算 ---- */
   function draw() {
     R.render(ctx, canvasCss(), project, state);
-    setDraftUi(!!state.draft); // Escで中止された場合もボタン・ヒントを戻す
+    setDraftUi(state.draft); // 作図の進み具合に応じてボタン・ヒントを更新
   }
   function refresh() {
     draw();
@@ -406,7 +427,15 @@
     const found = M.findById(project, el.id);
     if (!found) { box.innerHTML = '<p class="muted">—</p>'; return; }
     const kind = found.kind;
-    let html = `<div class="prop-row"><span>種別</span><b>${kindLabel(el, kind)}</b></div>`;
+    let html;
+    if (kind === 'regions') {
+      // 区画は種別(客室・厨房・トイレ…)をあとから変更できる
+      const opts = Object.entries(M.REGION_TYPES).map(([k, v]) =>
+        `<option value="${k}"${el.type === k ? ' selected' : ''}>${v.label}</option>`).join('');
+      html = `<div class="prop-row"><span>種別</span><select id="propType">${opts}</select></div>`;
+    } else {
+      html = `<div class="prop-row"><span>種別</span><b>${kindLabel(el, kind)}</b></div>`;
+    }
     html += propText('ラベル', 'label', el.label);
     html += propNum('X位置(mm)', 'x', el.x);
     html += propNum('Y位置(mm)', 'y', el.y);
@@ -461,6 +490,19 @@
         if (areaEl) areaEl.textContent = G.regionAreaSqm(el).toFixed(4) + ' ㎡';
       });
     });
+    // 区画の種別変更: ラベル・色・通し番号を新しい種別に合わせて付け直す
+    const typeSel = box.querySelector('#propType');
+    if (typeSel) {
+      typeSel.onchange = (e) => {
+        const t = e.target.value;
+        el.type = t;
+        el.color = M.REGION_TYPES[t].color;
+        el.number = M.nextRegionNumber(project, t);
+        el.label = t === 'kyakushitsu' ? `客室${el.number}` : M.REGION_TYPES[t].label;
+        ensureRegionVisible(t);
+        refresh(); showProps(el);
+      };
+    }
     // 多角形の頂点座標の編集(原点の取り直しがあるため change で確定時に反映)
     box.querySelectorAll('[data-vx], [data-vy]').forEach((inp) => {
       inp.addEventListener('change', (e) => {

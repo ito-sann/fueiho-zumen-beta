@@ -37,7 +37,16 @@
   function finishDraft(state) {
     const d = state.draft;
     state.draft = null;
-    if (d && d.points.length >= 3) d.onDone(d.points);
+    if (!d) return;
+    // ダブルクリック等で入る連続した重複点を取り除く
+    const pts = d.points.filter((p, i, a) =>
+      i === 0 || p.x !== a[i - 1].x || p.y !== a[i - 1].y);
+    // 先頭と末尾が同じ点なら末尾を落とす(閉じるクリックの取りこぼし対策)
+    if (pts.length >= 2 &&
+        pts[0].x === pts[pts.length - 1].x && pts[0].y === pts[pts.length - 1].y) {
+      pts.pop();
+    }
+    if (pts.length >= 3) d.onDone(pts);
   }
 
   /* 回転した長方形の内側判定。要素の中心まわりに -rotation だけ戻して矩形判定する。 */
@@ -74,7 +83,11 @@
   }
 
   function attach(canvas, ctx, project, state, onChange, onSelect) {
-    let mode = null; // 'drag' | 'pan' | 'vertex'
+    // 再アタッチ時(新規・読み込み)は前回の監視を外す。
+    // 外さないとイベントが二重に処理され、頂点の重複追加や矢印キーの2倍移動が起きる。
+    if (canvas._detachInteractions) canvas._detachInteractions();
+
+    let mode = null; // 'drag' | 'pan' | 'vertex' | 'north'
     let last = null; // 直前のマウス位置(画面px)
     let dragTarget = null;
     let grabOffset = { x: 0, y: 0 }; // 要素原点とカーソルの差(mm)
@@ -103,7 +116,7 @@
       return null;
     }
 
-    canvas.addEventListener('mousedown', (e) => {
+    const onMouseDown = (e) => {
       const p = pos(e);
       const w = global.Render.screenToWorld(p.x, p.y);
 
@@ -157,9 +170,9 @@
         onChange();
       }
       last = p;
-    });
+    };
 
-    window.addEventListener('mousemove', (e) => {
+    const onMouseMove = (e) => {
       const p0 = pos(e);
       // 作図中はカーソル位置までのプレビュー線を更新する
       if (state.draft) {
@@ -200,21 +213,21 @@
         onSelect(dragTarget); // プロパティ欄の座標も更新
       }
       last = p;
-    });
+    };
 
-    window.addEventListener('mouseup', () => {
+    const onMouseUp = () => {
       mode = null; dragTarget = null; vertexIndex = -1;
-    });
+    };
 
     // ダブルクリックでも多角形を確定できる(3点以上)
-    canvas.addEventListener('dblclick', () => {
+    const onDblClick = () => {
       if (state.draft && state.draft.points.length >= 3) {
         finishDraft(state);
         onChange();
       }
-    });
+    };
 
-    canvas.addEventListener('wheel', (e) => {
+    const onWheel = (e) => {
       e.preventDefault();
       const p = pos(e);
       const before = global.Render.screenToWorld(p.x, p.y);
@@ -226,11 +239,11 @@
       global.Render.view.offsetX += p.x - after.x;
       global.Render.view.offsetY += p.y - after.y;
       onChange();
-    }, { passive: false });
+    };
 
     // Delete キーで削除 / 矢印キーで微調整(1単位ぶん、Shiftで10倍)
     const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-    window.addEventListener('keydown', (e) => {
+    const onKeyDown = (e) => {
       const tag = (e.target.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       // 作図中: Enter で確定 / Esc で中止
@@ -262,8 +275,29 @@
         onChange();
         onSelect(found.element);
       }
-    });
+    };
+
+    canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener('dblclick', onDblClick);
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('keydown', onKeyDown);
+
+    // 次回の attach で外せるように覚えておく
+    canvas._detachInteractions = () => {
+      canvas.removeEventListener('mousedown', onMouseDown);
+      canvas.removeEventListener('dblclick', onDblClick);
+      canvas.removeEventListener('wheel', onWheel);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('keydown', onKeyDown);
+      canvas._detachInteractions = null;
+    };
   }
 
-  global.Interactions = { attach, snap, setSnap, getSnap, hitTest, beginPolygon, cancelPolygon };
+  global.Interactions = {
+    attach, snap, setSnap, getSnap, hitTest,
+    beginPolygon, cancelPolygon, finishPolygon: finishDraft,
+  };
 })(window);
