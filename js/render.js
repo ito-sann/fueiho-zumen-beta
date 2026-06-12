@@ -867,6 +867,70 @@
     ctx.restore();
   }
 
+  /* ---- メモ・引き出し線 ---- */
+
+  /* 文字の箱の大きさ(ワールドmm)。当たり判定用に描画のたびに覚えておく。 */
+  const noteBoxes = {};
+  function noteBox(id) { return noteBoxes[id] || { w: 1000, h: 500 }; }
+
+  /* メモを描く: 白い箱に文章(複数行可)、箱の中心から先端(tx,ty)へ引き出し線+矢印。
+   * 選択中は赤くし、矢印の先端にドラッグ用ハンドルを出す。 */
+  function drawNote(ctx, n, opts) {
+    const fpx = fontPx(240, n);
+    const lines = String(n.text || '').split('\n');
+    ctx.save();
+    ctx.font = `${fpx}px sans-serif`;
+    let wMax = fpx; // 空文字でもつかめる最小幅
+    for (const l of lines) wMax = Math.max(wMax, ctx.measureText(l).width);
+    const lineH = fpx * 1.35, pad = fpx * 0.4;
+    const p = worldToScreen(n.x, n.y);
+    const bw = wMax + pad * 2, bh = lineH * lines.length + pad * 2;
+    noteBoxes[n.id] = { w: bw / view.zoom, h: bh / view.zoom };
+    const tip = worldToScreen(n.tx, n.ty);
+    const line = opts.selected ? '#d32f2f' : '#37474f';
+    // 引き出し線(箱の中心から。箱の塗りで内側は隠れる)と先端の矢印
+    const cx = p.x + bw / 2, cy = p.y + bh / 2;
+    ctx.strokeStyle = line;
+    ctx.fillStyle = line;
+    ctx.lineWidth = opts.selected ? 2 : 1.5;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(tip.x, tip.y); ctx.stroke();
+    const a = Math.atan2(tip.y - cy, tip.x - cx);
+    const head = Math.max(6, fpx * 0.45);
+    ctx.beginPath();
+    ctx.moveTo(tip.x, tip.y);
+    ctx.lineTo(tip.x - head * Math.cos(a - 0.45), tip.y - head * Math.sin(a - 0.45));
+    ctx.lineTo(tip.x - head * Math.cos(a + 0.45), tip.y - head * Math.sin(a + 0.45));
+    ctx.closePath();
+    ctx.fill();
+    // 文字の箱
+    ctx.fillStyle = 'rgba(255,255,255,0.94)';
+    ctx.fillRect(p.x, p.y, bw, bh);
+    ctx.strokeRect(p.x, p.y, bw, bh);
+    // 本文
+    ctx.fillStyle = '#222';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    lines.forEach((l, i) => ctx.fillText(l, p.x + pad, p.y + pad + lineH * i + fpx * 0.12));
+    // 選択中: 先端ハンドル(ドラッグで指す場所を変えられる)
+    if (opts.selected) {
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#d32f2f';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.rect(tip.x - 4, tip.y - 4, 8, 8);
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* 今の図面に属するメモをまとめて描く */
+  function drawNotes(ctx, project, state) {
+    for (const n of (project.notes || [])) {
+      if ((n.layer || 'plan') !== currentLayer) continue;
+      drawNote(ctx, n, { selected: state.selectedId === n.id });
+    }
+  }
+
   /* どのレイヤーで何を表示するか */
   function visibility(layer) {
     switch (layer) {
@@ -913,9 +977,10 @@
       drawPaperFrame(ctx, project);
     }
 
-    // 備品姿図は間取りを描かず、姿図シートだけを描いて終わる
+    // 備品姿図は間取りを描かず、姿図シートとメモだけを描いて終わる
     if (currentLayer === 'furnviews') {
       drawFurnViews(ctx, canvas, project);
+      drawNotes(ctx, project, state);
       return;
     }
 
@@ -973,6 +1038,8 @@
     if (currentLayer === 'premises' && project.premise) {
       drawPremiseCenterline(ctx, project);
     }
+    // メモ・引き出し線(この図面に属するもの)は要素の上に描く
+    drawNotes(ctx, project, state);
     // 多角形の作図中なら下書きを最前面に描く
     if (state.draft && state.draft.points) {
       drawDraft(ctx, state.draft);
@@ -985,6 +1052,6 @@
   global.Render = {
     view, LAYERS, setLayer, getLayer, visibility,
     worldToScreen, screenToWorld, fitToView, render,
-    paperFrameWorld, getNorthMark, setRedrawCallback,
+    paperFrameWorld, getNorthMark, setRedrawCallback, noteBox,
   };
 })(window);

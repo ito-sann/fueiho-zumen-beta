@@ -128,6 +128,9 @@
       furniture: [],
       fittings: [],
       fixtures: [],
+      /* メモ・引き出し線。x,y=文字の箱の左上(mm)、tx,ty=矢印の先端(mm)。
+       * layer=表示する図面(作成時の図面にだけ出る)。図面・PDFにそのまま印字される。 */
+      notes: [],
       /* 必要書類チェックリストの状態。corp=法人かどうか, items={id: true} */
       checklist: { corp: false, items: {} },
       _seq: 1,
@@ -281,13 +284,29 @@
     return item;
   }
 
+  /* メモ・引き出し線を追加する。layer は表示する図面。位置はあとで呼び出し側が決める。 */
+  function addNote(project, layer) {
+    const note = {
+      id: nextId(project, 'n'),
+      text: 'メモ',
+      x: 1500,
+      y: 1500,
+      tx: 0,    // 矢印の先端(指したい場所)
+      ty: 2500,
+      layer: layer || 'plan',
+    };
+    project.notes = project.notes || [];
+    project.notes.push(note);
+    return note;
+  }
+
   function removeById(project, id) {
     if (project.premise && project.premise.id === id) {
       project.premise = null;
       return true;
     }
-    for (const key of ['regions', 'furniture', 'fittings', 'fixtures']) {
-      const i = project[key].findIndex((e) => e.id === id);
+    for (const key of ['regions', 'furniture', 'fittings', 'fixtures', 'notes']) {
+      const i = (project[key] || []).findIndex((e) => e.id === id);
       if (i >= 0) { project[key].splice(i, 1); return true; }
     }
     return false;
@@ -297,11 +316,38 @@
     if (project.premise && project.premise.id === id) {
       return { element: project.premise, kind: 'premise' };
     }
-    for (const key of ['regions', 'furniture', 'fittings', 'fixtures']) {
-      const e = project[key].find((e) => e.id === id);
+    for (const key of ['regions', 'furniture', 'fittings', 'fixtures', 'notes']) {
+      const e = (project[key] || []).find((e) => e.id === id);
       if (e) return { element: e, kind: key };
     }
     return null;
+  }
+
+  /* 選択中の要素を複製する(営業所外周は1つだけなので対象外)。
+   * 少し右下にずらして置き、新しい id を振る。区画は通し番号も振り直す。 */
+  function duplicateElement(project, id) {
+    const found = findById(project, id);
+    if (!found || found.kind === 'premise') return null;
+    const prefix = { regions: 'r', furniture: 'f', fittings: 'g', fixtures: 'x', notes: 'n' }[found.kind];
+    const copy = JSON.parse(JSON.stringify(found.element));
+    copy.id = nextId(project, prefix);
+    const d = 300; // 元の要素と完全に重ならないようにずらす量(mm)
+    copy.x += d;
+    copy.y += d;
+    if (found.kind === 'notes') { copy.tx += d; copy.ty += d; }
+    if (found.kind === 'regions') {
+      copy.number = nextRegionNumber(project, copy.type);
+      const t = REGION_TYPES[copy.type] || {};
+      // 既定のラベル(「客室1」「厨房」等)のままなら新しい番号で付け直す。手書きのラベルは残す
+      const isDefault = copy.type === 'kyakushitsu'
+        ? /^客室\d+$/.test(copy.label)
+        : copy.label === t.label;
+      if (isDefault) {
+        copy.label = copy.type === 'kyakushitsu' ? `客室${copy.number}` : t.label;
+      }
+    }
+    project[found.kind].push(copy);
+    return copy;
   }
 
   /* --- 保存 / 読み込み(JSON) --- */
@@ -321,6 +367,7 @@
     project.fixtures = obj.fixtures || [];
     project.premise = obj.premise || null;
     project.underlay = obj.underlay || null;
+    project.notes = obj.notes || [];
     project.checklist = Object.assign({ corp: false, items: {} }, obj.checklist || {});
     project.checklist.items = (obj.checklist && obj.checklist.items) || {};
     if (typeof project._seq !== 'number') {
@@ -335,7 +382,8 @@
     SIGHTLINE_LIMIT, CHECKLIST_ITEMS,
     todayStr, defaultProject, nextId, nextRegionNumber,
     addRegion, addPolygonRegion, normalizePolygon, setPremise,
-    addFurniture, addFitting, addFixture, removeById, findById,
+    addFurniture, addFitting, addFixture, addNote,
+    removeById, findById, duplicateElement,
     serialize, deserialize,
   };
 })(window);

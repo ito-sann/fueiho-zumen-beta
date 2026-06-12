@@ -81,7 +81,22 @@
     return false;
   }
 
+  /* メモ(文字の箱)の当たり判定。箱の大きさは描画時に Render が覚えている。 */
+  function noteAt(project, wx, wy) {
+    const notes = project.notes || [];
+    for (let i = notes.length - 1; i >= 0; i--) {
+      const n = notes[i];
+      if ((n.layer || 'plan') !== global.Render.getLayer()) continue;
+      const b = global.Render.noteBox(n.id);
+      if (wx >= n.x && wx <= n.x + b.w && wy >= n.y && wy <= n.y + b.h) return n;
+    }
+    return null;
+  }
+
   function hitTest(project, wx, wy) {
+    // 最前面のメモを最優先
+    const note = noteAt(project, wx, wy);
+    if (note) return note;
     // 上に描かれるもの(設備→備品→区画)を優先
     for (let i = project.fixtures.length - 1; i >= 0; i--) {
       const x = project.fixtures[i];
@@ -145,9 +160,33 @@
       const p = pos(e);
       const w = global.Render.screenToWorld(p.x, p.y);
 
-      // 備品姿図は一覧表示専用: パンとズームだけにする(隠れた要素を誤選択しない)
+      // 選択中のメモの矢印の先端をつかんだら、先端の移動モード(どの図面でも)
+      if (state.selectedId && !state.draft) {
+        const found = global.Model.findById(project, state.selectedId);
+        if (found && found.kind === 'notes') {
+          const s = global.Render.worldToScreen(found.element.tx, found.element.ty);
+          if (Math.hypot(p.x - s.x, p.y - s.y) <= 10) {
+            mode = 'notetip';
+            dragTarget = found.element;
+            last = p;
+            return;
+          }
+        }
+      }
+
+      // 備品姿図は一覧表示専用: メモ以外はパンとズームだけにする
       if (global.Render.getLayer() === 'furnviews' && !state.draft) {
-        mode = 'pan';
+        const n = noteAt(project, w.x, w.y);
+        if (n) {
+          mode = 'drag';
+          dragTarget = n;
+          grabOffset = { x: w.x - n.x, y: w.y - n.y };
+          state.selectedId = n.id;
+          onSelect(n);
+          onChange();
+        } else {
+          mode = 'pan';
+        }
         last = p;
         return;
       }
@@ -240,6 +279,14 @@
         global.Model.normalizePolygon(dragTarget);
         onChange();
         onSelect(dragTarget);
+      } else if (mode === 'notetip' && dragTarget) {
+        // 引き出し線の先端(指す場所)を動かす
+        const w = global.Render.screenToWorld(p.x, p.y);
+        let nx = w.x, ny = w.y;
+        if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); }
+        dragTarget.tx = nx;
+        dragTarget.ty = ny;
+        onChange();
       } else if (mode === 'underlay' && project.underlay) {
         // 下絵の移動(スナップあり・Shiftで自由)
         const w = global.Render.screenToWorld(p.x, p.y);

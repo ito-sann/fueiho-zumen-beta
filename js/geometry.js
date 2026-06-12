@@ -437,6 +437,9 @@
     if (u && u.visible !== false) {
       consider(u.x, u.y); consider(u.x + u.w, u.y + u.h);
     }
+    for (const n of (project.notes || [])) {
+      consider(n.x, n.y); consider(n.tx, n.ty);
+    }
     if (!isFinite(minX)) {
       return { x: 0, y: 0, w: 8000, h: 6000 };
     }

@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.5.0">
+  <link rel="stylesheet" href="css/style.css?v=1.6.0">
 </head>
 <body>
   <header class="topbar">
@@ -37,7 +37,12 @@
           <button id="btnCaseNew" class="btn small">新しい案件</button>
           <button id="btnCaseDel" class="btn small danger">この案件を削除</button>
         </div>
-        <p class="muted">案件ごとにブラウザ内へ自動保存されます。案件名は店舗名から自動でつきます。大事な案件はファイル保存も併用してください。</p>
+        <div class="add-row">
+          <button id="btnBackup" class="btn small">全案件をバックアップ</button>
+          <button id="btnRestore" class="btn small">取り込み</button>
+        </div>
+        <input type="file" id="backupInput" accept="application/json" hidden>
+        <p class="muted">案件ごとにブラウザ内へ自動保存されます。案件名は店舗名から自動でつきます。パソコンの買い替えに備えて、ときどき「全案件をバックアップ」でファイルに書き出してください。</p>
       </section>
 
       <section class="group">
@@ -134,6 +139,12 @@
       </section>
 
       <section class="group">
+        <h3>メモ・引き出し線</h3>
+        <button id="btnAddNote" class="btn block">メモを追加</button>
+        <p class="muted">いま開いている図面にだけ表示され、PDFにもそのまま印字されます。本文は右の「選択中の要素」で編集、矢印の先端(□)はドラッグで指したい場所へ動かせます。</p>
+      </section>
+
+      <section class="group">
         <h3>図面情報</h3>
         <label class="field">店舗名 <input type="text" id="metaStore"></label>
         <label class="field">所在地 <input type="text" id="metaAddr"></label>
@@ -192,7 +203,7 @@
     <!-- 中央:キャンバス -->
     <section class="canvas-wrap">
       <canvas id="canvas"></canvas>
-      <div class="hint" id="hint">空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(既定1cm吸着・Shiftで自由)/ 矢印キーで微調整(Shiftで10倍)/ Deleteで削除</div>
+      <div class="hint" id="hint">空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(既定1cm吸着・Shiftで自由)/ 矢印キーで微調整(Shiftで10倍)/ Cmd+Zで元に戻す / Cmd+Dで複製 / Deleteで削除</div>
     </section>
 
     <!-- 右:プロパティ・面積・注意 -->
@@ -233,12 +244,12 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.5.0"></script>
-  <script src="js/geometry.js?v=1.5.0"></script>
-  <script src="js/render.js?v=1.5.0"></script>
-  <script src="js/interactions.js?v=1.5.0"></script>
-  <script src="js/print.js?v=1.5.0"></script>
-  <script src="js/forms.js?v=1.5.0"></script>
-  <script src="js/main.js?v=1.5.0"></script>
+  <script src="js/model.js?v=1.6.0"></script>
+  <script src="js/geometry.js?v=1.6.0"></script>
+  <script src="js/render.js?v=1.6.0"></script>
+  <script src="js/interactions.js?v=1.6.0"></script>
+  <script src="js/print.js?v=1.6.0"></script>
+  <script src="js/forms.js?v=1.6.0"></script>
+  <script src="js/main.js?v=1.6.0"></script>
 </body>
 </html>

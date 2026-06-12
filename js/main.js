@@ -132,8 +132,9 @@
     if (u) u.disabled = history.index <= 0;
     if (r) r.disabled = history.index >= history.stack.length - 1;
   }
-  /* Cmd/Ctrl+Z=元に戻す, Shift+Cmd/Ctrl+Z または Ctrl+Y=やり直す。
-   * 入力欄の中ではブラウザ標準の取り消しを邪魔しない。 */
+  /* キーボードショートカット:
+   *   Cmd/Ctrl+Z=元に戻す, Shift+Cmd/Ctrl+Z(または Ctrl+Y)=やり直す, Cmd/Ctrl+D=複製。
+   * 入力欄の中ではブラウザ標準の動きを邪魔しない。 */
   function onUndoKeys(e) {
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
@@ -143,7 +144,20 @@
     } else if (e.ctrlKey && e.key.toLowerCase() === 'y') {
       e.preventDefault();
       redo();
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      duplicateSelected();
     }
+  }
+
+  /* 選択中の要素を複製して、複製のほうを選択する */
+  function duplicateSelected() {
+    if (!state.selectedId) return;
+    const copy = M.duplicateElement(project, state.selectedId);
+    if (!copy) return;
+    state.selectedId = copy.id;
+    refresh();
+    showProps(copy);
   }
 
   /* 図面オブジェクトを差し替えて画面全体を作り直す(読み込み・案件切替・元に戻す共通) */
@@ -301,6 +315,26 @@
       adoptProject(loadCase(next.id) || M.defaultProject());
       resetHistory();
       buildCaseSelect();
+    };
+
+    // 全案件のバックアップ(書き出し/取り込み)
+    $('btnBackup').onclick = exportBackup;
+    $('btnRestore').onclick = () => $('backupInput').click();
+    $('backupInput').onchange = importBackupFile;
+
+    // メモ・引き出し線(いま開いている図面に追加)
+    $('btnAddNote').onclick = () => {
+      const n = M.addNote(project, R.getLayer());
+      const c = canvasCss();
+      const center = R.screenToWorld(c.width / 2, c.height / 2);
+      const d = cascade();
+      n.x = I.snap(center.x + d);
+      n.y = I.snap(center.y - 600 + d);
+      n.tx = I.snap(n.x - 1500);
+      n.ty = I.snap(n.y + 1500);
+      state.selectedId = n.id;
+      refresh();
+      showProps(n);
     };
 
     // 下絵(間取り図のトレース)
@@ -505,7 +539,7 @@
 
   /* 作図モード中のボタン表示とヒント文を切り替える。
    * 区画(btnDrawPoly)と営業所外周(btnDrawPremise)のどちらの作図かは state.draftKind で判定。 */
-  const HINT_DEFAULT = '空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(既定1cm吸着・Shiftで自由)/ 矢印キーで微調整(Shiftで10倍)/ Deleteで削除';
+  const HINT_DEFAULT = '空きをドラッグで移動 / ホイールで拡大縮小 / 要素をドラッグで配置(既定1cm吸着・Shiftで自由)/ 矢印キーで微調整(Shiftで10倍)/ Cmd+Zで元に戻す / Cmd+Dで複製 / Deleteで削除';
   const HINT_DRAFT = '多角形の作図中: クリックで角を置く / 最初の点をクリック・ダブルクリック・Enterで確定 / Escで中止';
   function setDraftUi(draft) {
     const btnR = $('btnDrawPoly');
@@ -826,11 +860,17 @@
     } else {
       html = `<div class="prop-row"><span>種別</span><b>${kindLabel(el, kind)}</b></div>`;
     }
-    html += propText('ラベル', 'label', el.label);
+    if (kind === 'notes') {
+      // メモは本文(複数行可)を直接編集する
+      html += `<label class="prop-row"><span>本文</span>
+        <textarea data-field="text" rows="3">${esc(el.text || '')}</textarea></label>`;
+    } else {
+      html += propText('ラベル', 'label', el.label);
+    }
     // ラベルを持つ要素は文字サイズを個別に調整できる。
     // Googleドキュメント風のサイズ番号(15=標準)で、−/＋は段階リストを移動する。
-    if (kind === 'regions' || kind === 'furniture' || kind === 'fittings') {
-      const dMm = kind === 'regions' ? 320 : 200; // render.js の既定値と揃える
+    if (kind === 'regions' || kind === 'furniture' || kind === 'fittings' || kind === 'notes') {
+      const dMm = kind === 'regions' ? 320 : (kind === 'notes' ? 240 : 200); // render.js の既定値と揃える
       const curSize = el.fontSize > 0 ? el.fontSize
         : (el.fontMm > 0 ? Math.round(el.fontMm / dMm * 15) : 15);
       html += `<div class="prop-row"><span>文字サイズ</span>
@@ -844,6 +884,13 @@
     }
     html += propNum('X位置(mm)', 'x', el.x);
     html += propNum('Y位置(mm)', 'y', el.y);
+    if (kind === 'notes') {
+      // どの図面に表示するかをあとから変えられる(矢印の先端はドラッグで移動)
+      const lopts = Object.entries(R.LAYERS).map(([k, v]) =>
+        `<option value="${k}"${(el.layer || 'plan') === k ? ' selected' : ''}>${v.label}</option>`).join('');
+      html += `<div class="prop-row"><span>表示する図面</span><select id="propNoteLayer">${lopts}</select></div>
+        <p class="muted">矢印の先端(□)はドラッグで指したい場所へ動かせます。</p>`;
+    }
     if (kind === 'furniture' || kind === 'fittings') {
       html += propNum(kind === 'fittings' ? '長さ(mm)' : '幅(mm)', 'w', el.w);
       html += propNum(kind === 'fittings' ? '厚み(mm)' : '奥行(mm)', 'h', el.h);
@@ -901,7 +948,14 @@
       const area = G.regionAreaSqm(el);
       html += `<div class="prop-row"><span>面積</span><b id="propArea">${area.toFixed(4)} ㎡</b></div>`;
     }
-    html += `<button class="btn small danger" id="btnDel">この要素を削除</button>`;
+    if (kind === 'premise') {
+      // 営業所外周は1つだけなので複製はなし
+      html += `<button class="btn small danger" id="btnDel">この要素を削除</button>`;
+    } else {
+      html += `<div class="add-row">
+        <button class="btn small" id="btnDup" title="複製 (Cmd/Ctrl+D)">複製</button>
+        <button class="btn small danger" id="btnDel">この要素を削除</button></div>`;
+    }
     box.innerHTML = html;
 
     box.querySelectorAll('[data-field]').forEach((inp) => {
@@ -983,6 +1037,18 @@
         refresh(); showProps(el);
       });
     });
+    // メモの表示先の図面を変更(変更後の図面に切り替えて見せる)
+    const noteLayerSel = box.querySelector('#propNoteLayer');
+    if (noteLayerSel) {
+      noteLayerSel.onchange = (e) => {
+        el.layer = e.target.value;
+        R.setLayer(el.layer);
+        buildLayerTabs();
+        refresh();
+      };
+    }
+    const dupBtn = box.querySelector('#btnDup');
+    if (dupBtn) dupBtn.onclick = duplicateSelected;
     $('btnDel').onclick = () => {
       M.removeById(project, el.id);
       state.selectedId = null;
@@ -999,6 +1065,7 @@
     if (kind === 'premise') return '営業所外周(壁芯)';
     if (kind === 'furniture') return '備品';
     if (kind === 'fittings') return '建具・設備';
+    if (kind === 'notes') return 'メモ・引き出し線';
     return '照明・音響';
   }
   function propText(label, field, val) {
@@ -1008,6 +1075,85 @@
   function propNum(label, field, val) {
     return `<label class="prop-row"><span>${label}</span>
       <input type="number" step="10" data-field="${field}" value="${val}"></label>`;
+  }
+
+  /* ---- 全案件の一括バックアップ ----
+   * 案件はブラウザ内に保存されるため、パソコンの買い替えやデータ消去に備えて
+   * 全案件を1つのJSONファイルへ書き出し/取り込みできるようにする。 */
+  function exportBackup() {
+    saveAutosave(); // いま開いている案件を最新の状態にしてから書き出す
+    const list = readCases();
+    const cases = [];
+    for (const c of list) {
+      try {
+        const text = localStorage.getItem(caseKey(c.id));
+        if (text) cases.push({ id: c.id, name: c.name, updatedAt: c.updatedAt, project: JSON.parse(text) });
+      } catch (e) { /* 壊れた控えは飛ばす */ }
+    }
+    if (!cases.length) {
+      alert('書き出せる案件がありません。');
+      return;
+    }
+    const data = {
+      app: 'shinya-zumen',
+      type: 'backup',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      cases,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `深夜酒類図面_全案件バックアップ_${M.todayStr()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importBackupFile(e) {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data || data.type !== 'backup' || !Array.isArray(data.cases)) {
+          alert('全案件バックアップのファイルではありません。\n(1案件だけのファイルは上の「読み込み」ボタンから開けます)');
+          return;
+        }
+        const list = readCases();
+        const overlap = data.cases.filter((c) => c && list.some((x) => x.id === c.id)).length;
+        const msg = `${data.cases.length}件の案件を取り込みます。` +
+          (overlap ? `\nうち${overlap}件は同じ案件がすでにあり、バックアップの内容で上書きされます。` : '') +
+          '\nよろしいですか?';
+        if (!confirm(msg)) return;
+        let done = 0;
+        for (const c of data.cases) {
+          if (!c || !c.id || !c.project) continue;
+          localStorage.setItem(caseKey(c.id), JSON.stringify(c.project));
+          const it = list.find((x) => x.id === c.id);
+          if (it) {
+            it.name = c.name || it.name;
+            it.updatedAt = c.updatedAt || Date.now();
+          } else {
+            list.push({ id: c.id, name: c.name || '無題の案件', updatedAt: c.updatedAt || Date.now() });
+          }
+          done++;
+        }
+        writeCases(list);
+        // いま開いている案件が上書きされたら、取り込んだ内容で開き直す
+        if (data.cases.some((c) => c && c.id === currentCaseId)) {
+          adoptProject(loadCase(currentCaseId) || project);
+          resetHistory();
+        }
+        buildCaseSelect();
+        alert(`${done}件の案件を取り込みました。`);
+      } catch (err) {
+        alert('取り込みに失敗しました: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
   }
 
   /* ---- 下絵(間取り図のトレース用画像) ---- */
