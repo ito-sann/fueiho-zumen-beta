@@ -439,15 +439,19 @@
       html = `<div class="prop-row"><span>種別</span><b>${kindLabel(el, kind)}</b></div>`;
     }
     html += propText('ラベル', 'label', el.label);
-    // ラベルを持つ要素は文字サイズを個別に調整できる(−/＋で増減、自動=全体設定)
+    // ラベルを持つ要素は文字サイズを個別に調整できる。
+    // Googleドキュメント風のサイズ番号(15=標準)で、−/＋は段階リストを移動する。
     if (kind === 'regions' || kind === 'furniture' || kind === 'fittings') {
+      const dMm = kind === 'regions' ? 320 : 200; // render.js の既定値と揃える
+      const curSize = el.fontSize > 0 ? el.fontSize
+        : (el.fontMm > 0 ? Math.round(el.fontMm / dMm * 15) : 15);
       html += `<div class="prop-row"><span>文字サイズ</span>
         <span class="font-ctrl">
           <button type="button" id="fontMinus" class="btn small">−</button>
-          <input type="number" id="fontInput" step="10" min="0" placeholder="自動"
-                 value="${el.fontMm > 0 ? el.fontMm : ''}" title="実寸mm">
+          <input type="number" id="fontInput" step="1" min="6" max="96"
+                 value="${curSize}" title="サイズ(15=標準)">
           <button type="button" id="fontPlus" class="btn small">＋</button>
-          <button type="button" id="fontAuto" class="btn small">自動</button>
+          <button type="button" id="fontAuto" class="btn small">標準</button>
         </span></div>`;
     }
     html += propNum('X位置(mm)', 'x', el.x);
@@ -503,31 +507,41 @@
         if (areaEl) areaEl.textContent = G.regionAreaSqm(el).toFixed(4) + ' ㎡';
       });
     });
-    // 文字サイズの −/＋/自動。基準は「いま表示されている大きさ」(個別指定がなければ
-    // 種類ごとの既定×全体設定)で、そこから50mm刻みで増減する。
+    // 文字サイズ(Googleドキュメント風)。15が標準で、−/＋は段階リストの
+    // 前後のサイズへ移動する。数値の直接入力も可能(6〜96)。標準=15に戻す。
     const fontInput = box.querySelector('#fontInput');
     if (fontInput) {
+      const STEPS = [8, 9, 10, 11, 12, 14, 15, 18, 24, 30, 36, 48, 60, 72, 96];
       const defaultMm = kind === 'regions' ? 320 : 200; // render.js の既定値と揃える
-      const currentMm = () => (el.fontMm > 0
-        ? el.fontMm
-        : Math.round(defaultMm * ((project.meta.fontScale || 100) / 100)));
-      const apply = (mm) => {
-        el.fontMm = Math.max(50, Math.round(mm / 10) * 10);
-        fontInput.value = el.fontMm;
+      const current = () => (el.fontSize > 0 ? el.fontSize
+        : (el.fontMm > 0 ? Math.round(el.fontMm / defaultMm * 15) : 15));
+      const apply = (s) => {
+        el.fontSize = Math.min(96, Math.max(6, Math.round(s)));
+        el.fontMm = 0; // 旧形式の指定は新形式へ置き換える
+        fontInput.value = el.fontSize;
         refresh();
       };
-      box.querySelector('#fontMinus').onclick = () => apply(currentMm() - 50);
-      box.querySelector('#fontPlus').onclick = () => apply(currentMm() + 50);
-      box.querySelector('#fontAuto').onclick = () => {
-        el.fontMm = 0;
-        fontInput.value = '';
-        refresh();
+      box.querySelector('#fontMinus').onclick = () => {
+        const c = current();
+        const smaller = STEPS.filter((s) => s < c);
+        apply(smaller.length ? smaller[smaller.length - 1] : c);
       };
+      box.querySelector('#fontPlus').onclick = () => {
+        const c = current();
+        const bigger = STEPS.find((s) => s > c);
+        apply(bigger != null ? bigger : c);
+      };
+      box.querySelector('#fontAuto').onclick = () => apply(15);
+      // 入力中は値を書き戻さない(タイプの邪魔をしない)。確定時にだけ丸める。
       fontInput.addEventListener('input', (e) => {
         const v = parseFloat(e.target.value);
-        el.fontMm = v > 0 ? v : 0;
-        refresh();
+        if (v > 0) {
+          el.fontSize = Math.min(96, Math.max(6, Math.round(v)));
+          el.fontMm = 0;
+          refresh();
+        }
       });
+      fontInput.addEventListener('change', () => apply(current()));
     }
     // 区画の種別変更: ラベル・色・通し番号を新しい種別に合わせて付け直す
     const typeSel = box.querySelector('#propType');
