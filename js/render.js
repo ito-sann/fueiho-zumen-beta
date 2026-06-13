@@ -748,35 +748,66 @@
   /* ---- 備品姿図(正面図・側面図) ---- */
 
   /* 同寸法グループごとのセル配置を計算する(ワールドmm)。
-   * 1セル = ラベル + 正面図(幅×高さ) + 側面図(奥行×高さ) + 寸法。 */
+   * 全セルを同じ大きさの「カード」にそろえ、用紙の幅に収まる列数で
+   * きれいに格子状(グリッド)に並べる。間隔は詰めて、用紙からはみ出しにくくする。 */
   function furnViewLayout(project) {
     const groups = global.Geometry.furnitureGroups(project);
-    const LABEL_H = 700, DIM_H = 900, GAP = 1500, CELL_GAP = 2600, ROW_GAP = 1600;
-    const MAX_W = 14000; // 1行の最大幅(mm)。超えたら折り返す
+    // 余白・間隔(ワールドmm) — 旧版より大幅に詰めた
+    const PAD = 350;       // カード内側の余白
+    const LABEL_H = 650;   // 品名ラベルの高さ
+    const CAP_H = 800;     // 図の下の寸法キャプションの高さ
+    const INNER_GAP = 600; // 正面図と側面図のすき間
+    const HDIM_W = 1500;   // 高さ寸法(縦書き)の右余白
+    const COL_GAP = 900, ROW_GAP = 900; // カード同士のすき間
+    const MARGIN = 900;    // 用紙枠の内側に取る余白
+    const TITLE_H = 1500;  // 上部タイトルのための余白
+
+    if (!groups.length) {
+      return { cells: [], pad: PAD, innerGap: INNER_GAP, capH: CAP_H,
+               labelH: LABEL_H, bounds: { x: 0, y: 0, w: 8000, h: 4000 } };
+    }
+
+    // 用紙の使える幅(枠表示中は枠の内側、非表示なら既定値)
+    const frame = project.meta.showPaperFrame ? paperFrameWorld(project) : null;
+    const originX = (frame ? frame.x : 0) + MARGIN;
+    const originY = (frame ? frame.y : 0) + TITLE_H;
+    // 1行に詰め込める右端。1品が単独で超える場合はその品の幅を許容
+    const cardW = (g) => PAD * 2 + (g.w + INNER_GAP + g.h) + HDIM_W;
+    const maxCardW = groups.reduce((m, g) => Math.max(m, cardW(g)), 0);
+    const availW = frame ? Math.max(maxCardW, frame.w - MARGIN * 2) : 14000;
+
+    // 横に流し込み、用紙幅を超えたら折り返す(フロー配置)。
+    // 行内は床(ベースライン)をそろえ、カード高さも行内で統一する。
     const cells = [];
-    let x = 0, rowTop = 1000, rowMaxH = 0, row = [];
-    const rows = [];
+    let x = originX, rowTop = originY, rowMaxFigH = 0, row = [];
+    let maxRight = originX;
     const flushRow = () => {
       if (!row.length) return;
-      // 行内で床の高さ(ベースライン)を揃える
-      const floorY = rowTop + LABEL_H + rowMaxH;
-      for (const c of row) c.floorY = floorY;
-      rows.push({ top: rowTop, floorY, right: x });
-      rowTop = floorY + DIM_H + ROW_GAP;
-      x = 0; rowMaxH = 0; row = [];
+      const cardH = PAD * 2 + LABEL_H + rowMaxFigH + CAP_H;
+      const floorY = rowTop + PAD + LABEL_H + rowMaxFigH;
+      for (const c of row) { c.y = rowTop; c.cellH = cardH; c.floorY = floorY; }
+      maxRight = Math.max(maxRight, x - COL_GAP);
+      rowTop += cardH + ROW_GAP;
+      x = originX; rowMaxFigH = 0; row = [];
     };
     for (const g of groups) {
-      const cellW = g.w + GAP + g.h + 1800; // 正面 + 側面 + 高さ寸法の余白
-      if (x > 0 && x + cellW > MAX_W) flushRow();
-      const cell = { g, x: x + 1000, cellW };
+      const cw = cardW(g);
+      if (row.length && x + cw > originX + availW) flushRow();
+      const cell = { g, x, cellW: cw, contentW: g.w + INNER_GAP + g.h };
       row.push(cell); cells.push(cell);
-      rowMaxH = Math.max(rowMaxH, g.height);
-      x += cellW + CELL_GAP;
+      x += cw + COL_GAP;
+      rowMaxFigH = Math.max(rowMaxFigH, g.height || 0, 400);
     }
     flushRow();
-    const maxRight = rows.reduce((m, r) => Math.max(m, r.right), 6000);
-    const bottom = rows.length ? rows[rows.length - 1].floorY + DIM_H : 4000;
-    return { cells, rows, bounds: { x: 0, y: 0, w: maxRight + 2000, h: bottom + 1000 } };
+
+    const bottom = rowTop - ROW_GAP;
+    const bounds = {
+      x: 0, y: 0,
+      w: Math.max(maxRight + MARGIN, frame ? frame.x + frame.w : 0) + (frame ? MARGIN : 0),
+      h: Math.max(bottom + MARGIN, frame ? frame.y + frame.h : 0) + (frame ? MARGIN : 0),
+    };
+    return { cells, pad: PAD, innerGap: INNER_GAP, capH: CAP_H,
+             labelH: LABEL_H, bounds };
   }
 
   /* 備品姿図を描く。グループごとに正面図と側面図を並べ、寸法と番号を付ける。
@@ -786,12 +817,12 @@
     const G = global.Geometry;
     ctx.save();
     // タイトル
-    const t0 = worldToScreen(1000, 300);
+    const t0 = worldToScreen(900, 450);
     ctx.fillStyle = '#222';
     ctx.font = `bold ${fontPx(360)}px sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText('備品姿図(正面図・側面図) — 基準線は床から1m(見通し規制)', t0.x, t0.y);
+    ctx.fillText('備品姿図(正面図・側面図) — 赤の破線は床から1m(見通し規制)', t0.x, t0.y);
     if (!layout.cells.length) {
       ctx.font = `${fontPx(300)}px sans-serif`;
       ctx.fillStyle = '#777';
@@ -799,42 +830,53 @@
       ctx.restore();
       return;
     }
-    for (const r of layout.rows) {
-      // 床線(行ごと)
-      const f1 = worldToScreen(600, r.floorY), f2 = worldToScreen(r.right + 600, r.floorY);
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(f1.x, f1.y); ctx.lineTo(f2.x, f2.y); ctx.stroke();
-      // 1m 基準線(赤の破線)
-      const m1 = worldToScreen(600, r.floorY - 1000), m2 = worldToScreen(r.right + 600, r.floorY - 1000);
-      ctx.strokeStyle = '#c62828';
+    const pad = layout.pad, innerGap = layout.innerGap;
+    for (const c of layout.cells) {
+      const g = c.g;
+      const over = g.over;
+      const line = over ? '#c62828' : '#37474f';
+      const fill = over ? 'rgba(255,205,210,0.55)' : 'rgba(236,239,241,0.85)';
+      // --- カード枠(うっすら背景) ---
+      const ctl = worldToScreen(c.x, c.y);
+      const cbr = worldToScreen(c.x + c.cellW, c.y + c.cellH);
+      ctx.fillStyle = over ? 'rgba(255,235,238,0.6)' : 'rgba(255,255,255,0.55)';
+      ctx.strokeStyle = over ? '#ef9a9a' : '#cfd8dc';
+      ctx.lineWidth = 1;
+      roundRect(ctx, ctl.x, ctl.y, cbr.x - ctl.x, cbr.y - ctl.y, wpx(180));
+      ctx.fill(); ctx.stroke();
+
+      const left = c.x + pad;
+      // --- 品名ラベル(品名 + サイズ番号 + 台数) ---
+      const name = `${g.label}${G.code(g.number)}(${g.count}台)` + (over ? ' ⚠高さ1m超' : '');
+      const lp = worldToScreen(left, c.y + pad);
+      ctx.fillStyle = over ? '#c62828' : '#222';
+      ctx.font = `bold ${fontPx(250)}px sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(name, lp.x, lp.y);
+
+      // --- 床線(ベースライン) と 1m 基準線(カード内のみ) ---
+      const spanR = left + c.contentW;
+      const f1 = worldToScreen(left, c.floorY), f2 = worldToScreen(spanR, c.floorY);
+      ctx.strokeStyle = '#455a64';
       ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(f1.x, f1.y); ctx.lineTo(f2.x, f2.y); ctx.stroke();
+      const m1 = worldToScreen(left, c.floorY - 1000), m2 = worldToScreen(spanR, c.floorY - 1000);
+      ctx.strokeStyle = '#c62828';
+      ctx.lineWidth = 1.2;
       ctx.setLineDash([8, 5]);
       ctx.beginPath(); ctx.moveTo(m1.x, m1.y); ctx.lineTo(m2.x, m2.y); ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = '#c62828';
-      ctx.font = `${fontPx(220)}px sans-serif`;
-      ctx.textAlign = 'left';
+      ctx.font = `${fontPx(200)}px sans-serif`;
+      ctx.textAlign = 'right';
       ctx.textBaseline = 'bottom';
-      ctx.fillText('1m', m2.x + wpx(100), m2.y);
-    }
-    for (const c of layout.cells) {
-      const g = c.g;
-      const over = g.over;
-      const line = over ? '#c62828' : '#333';
-      const fill = over ? 'rgba(255,205,210,0.5)' : 'rgba(250,250,250,0.9)';
-      // ラベル(品名 + サイズ番号 + 台数)
-      const name = `${g.label}${G.code(g.number)}(${g.count}台)` + (over ? ' ⚠高さ1m超' : '');
-      const lp = worldToScreen(c.x, c.floorY - g.height - 250);
-      ctx.fillStyle = over ? '#c62828' : '#222';
-      ctx.font = `bold ${fontPx(260)}px sans-serif`;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(name, lp.x, lp.y);
-      // 正面図(幅 × 高さ) と 側面図(奥行 × 高さ)
+      ctx.fillText('1m', m2.x - wpx(60), m2.y - wpx(40));
+
+      // --- 正面図(幅 × 高さ) と 側面図(奥行 × 高さ) ---
       const views = [
-        { x0: c.x, w: g.w, cap: '正面', dim: g.w },
-        { x0: c.x + g.w + 1500, w: g.h, cap: '側面', dim: g.h },
+        { x0: left, w: g.w, cap: `正面 幅${G.fmtM(g.w)}m` },
+        { x0: left + g.w + innerGap, w: g.h, cap: `側面 奥行${G.fmtM(g.h)}m` },
       ];
       for (const v of views) {
         const tl = worldToScreen(v.x0, c.floorY - g.height);
@@ -844,27 +886,37 @@
         ctx.strokeStyle = line;
         ctx.lineWidth = 1.5;
         ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-        // 下に「正面 幅0.60m」のように寸法を書く
         ctx.fillStyle = '#1565c0';
-        ctx.font = `${fontPx(220)}px sans-serif`;
+        ctx.font = `${fontPx(200)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        const label = v.cap === '正面' ? `正面 幅${G.fmtM(v.dim)}m` : `側面 奥行${G.fmtM(v.dim)}m`;
-        ctx.fillText(label, (tl.x + br.x) / 2, br.y + wpx(150));
+        ctx.fillText(v.cap, (tl.x + br.x) / 2, br.y + wpx(130));
       }
-      // 高さ寸法(側面図の右側に縦書き)
-      const hx = worldToScreen(c.x + g.w + 1500 + g.h + 400, c.floorY - g.height / 2);
+      // --- 高さ寸法(側面図の右側に縦書き) ---
+      const hx = worldToScreen(left + g.w + innerGap + g.h + 350, c.floorY - g.height / 2);
       ctx.save();
       ctx.translate(hx.x, hx.y);
       ctx.rotate(-Math.PI / 2);
       ctx.fillStyle = over ? '#c62828' : '#1565c0';
-      ctx.font = `${fontPx(220)}px sans-serif`;
+      ctx.font = `${fontPx(200)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(`高さ${G.fmtM(g.height)}m`, 0, 0);
       ctx.restore();
     }
     ctx.restore();
+  }
+
+  /* 角丸の長方形パスを作る(塗り/線は呼び出し側で) */
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
   }
 
   /* ---- メモ・引き出し線 ---- */
