@@ -328,10 +328,13 @@
   /* 備品をまとめる際のキー。同じ種類・寸法・形・正面/側面の形なら同じ1台として数える。
    * 自由な形は外形寸法が同じでも形が違えば別物として扱う。 */
   function furnKey(f) {
-    return f.shape === 'polygon'
-      ? `custom|${f.label}|${f.height || 0}|${JSON.stringify(f.points)}` +
-        `|${JSON.stringify(f.front || null)}|${JSON.stringify(f.side || null)}`
-      : `${f.kind}|${f.w}|${f.h}|${f.height || 0}`;
+    if (f.shape === 'polygon') {
+      return `custom|${f.label}|${f.height || 0}|${JSON.stringify(f.points)}` +
+        `|${JSON.stringify(f.front || null)}|${JSON.stringify(f.side || null)}`;
+    }
+    // 姿図スタイル(variant)も含める。未指定は既定スタイルとして揃える
+    const variant = f.variant || global.Model.defaultStyle(f.kind) || '';
+    return `${f.kind}|${f.w}|${f.h}|${f.height || 0}|${variant}`;
   }
 
   function furnitureGroups(project) {
@@ -344,10 +347,12 @@
         counters[f.kind] = (counters[f.kind] || 0) + 1;
         map.set(key, {
           key,
-          kind: f.kind, label: f.label,
+          kind: f.kind, label: f.label, variant: f.variant || null,
           w: f.w, h: f.h, height: f.height || 0,
           shape: f.shape || 'rect', points: f.points || null,
-          front: f.front || null, side: f.side || null,
+          // 手で描いた形(front/side)が優先。無ければ種類・スタイルのプリセット形
+          front: f.front || global.Model.furniturePreset(f, 'front'),
+          side: f.side || global.Model.furniturePreset(f, 'side'),
           number: counters[f.kind], count: 0,
           over: (f.height || 0) > limit, // 高さ1m超(見通し規制の注意対象)
         });

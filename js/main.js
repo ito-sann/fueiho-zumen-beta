@@ -245,6 +245,7 @@
     for (const [key, v] of Object.entries(M.FURNITURE_CATALOG)) {
       fk.add(new Option(`${v.label}(${v.w}×${v.h})`, key));
     }
+    populateFurnStyles(); // 選択中の種類に応じた姿図スタイルを並べる
     const gk = $('fittingKind');
     for (const [key, v] of Object.entries(M.FITTING_CATALOG)) {
       gk.add(new Option(v.label, key));
@@ -484,9 +485,11 @@
         refresh();
       }
     };
+    // 種類を変えたら、その種類で選べる姿図スタイルに並べ替える
+    $('furnKind').onchange = populateFurnStyles;
     $('btnAddFurn').onclick = () => {
       if (R.getLayer() === 'furnviews') { R.setLayer('plan'); buildLayerTabs(); } // 姿図では配置できない
-      const f = M.addFurniture(project, $('furnKind').value);
+      const f = M.addFurniture(project, $('furnKind').value, $('furnStyle').value || undefined);
       placeAtViewCenter(f);
       state.selectedId = f.id;
       refresh(); showProps(f);
@@ -815,6 +818,20 @@
 
   /* サイドバーの各欄を、いま開いている図面に関係あるものだけ表示する。
    * 表示する図面は index.html 側の data-layers 属性で指定する(無印は常時表示)。 */
+  /* 「備品を追加」の姿図スタイル選択肢を、選択中の種類に合わせて作り直す。
+   * スタイルが1つもない種類では選択欄を隠す。 */
+  function populateFurnStyles() {
+    const sel = $('furnStyle');
+    const row = $('furnStyleRow');
+    if (!sel || !row) return;
+    const kind = $('furnKind').value;
+    const styles = M.FURNITURE_STYLES[kind];
+    sel.innerHTML = '';
+    if (!styles) { row.style.display = 'none'; return; }
+    row.style.display = '';
+    for (const [key, v] of Object.entries(styles)) sel.add(new Option(v.label, key));
+  }
+
   function applyPanelVisibility() {
     const layer = R.getLayer();
     document.querySelectorAll('section[data-layers]').forEach((el) => {
@@ -1101,6 +1118,16 @@
     }
     if (kind === 'furniture') {
       html += propNum('高さ(mm)', 'height', el.height || 0);
+      // カタログ備品(自由な形でない)は姿図スタイル(正面図・側面図の形)を選べる
+      if (el.shape !== 'polygon' && M.FURNITURE_STYLES[el.kind]) {
+        const styles = M.FURNITURE_STYLES[el.kind];
+        const cur = el.variant || M.defaultStyle(el.kind);
+        const opts = Object.entries(styles).map(([k, v]) =>
+          `<option value="${k}" ${k === cur ? 'selected' : ''}>${v.label}</option>`).join('');
+        html += `<label class="field">姿図スタイル(正面図・側面図)
+          <select id="furnVariantSel">${opts}</select></label>
+          <p class="muted">備品姿図に出る正面図・側面図の形を選べます。寸法を変えると形も自動で拡大縮小します。</p>`;
+      }
       // 番号はサイズ違いの区別用に自動で決まる(同じ種類・同じ寸法 = 同じ番号)
       const num = G.furnitureNumberMap(project)[el.id];
       html += `<div class="prop-row"><span>番号</span><b id="propFurnNum">${num ? G.code(num) : '—'}</b></div>
@@ -1203,6 +1230,10 @@
         refresh();
       });
     });
+
+    // カタログ備品: 姿図スタイル(正面図・側面図の形)を切り替える
+    const vs = box.querySelector('#furnVariantSel');
+    if (vs) vs.onchange = () => { el.variant = vs.value; refresh(); showProps(el); };
 
     // 自由な形の備品: 正面・側面の「横から見た形」をなぞる / 消す
     const bf = box.querySelector('#btnProfFront');

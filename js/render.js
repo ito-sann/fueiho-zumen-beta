@@ -1069,6 +1069,28 @@
              labelH: LABEL_H, bounds };
   }
 
+  /* 姿図のシルエットを描く。prof は1多角形({x,y}の配列)でも、
+   * 複数部品(多角形の配列)でもよい。x0=左端, floorY=床のpx。 */
+  function drawProfileShape(ctx, prof, x0, floorY) {
+    const drawPoly = (poly) => {
+      ctx.beginPath();
+      poly.forEach((pt, i) => {
+        const s = worldToScreen(x0 + pt.x, floorY - pt.y);
+        if (i) ctx.lineTo(s.x, s.y); else ctx.moveTo(s.x, s.y);
+      });
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    };
+    if (Array.isArray(prof[0])) prof.forEach(drawPoly); // 複数部品
+    else drawPoly(prof);                                // 1多角形
+  }
+
+  /* prof が描ける形を持っているか(1多角形=2点以上 / 複数部品=1つ以上) */
+  function hasProfile(prof) {
+    if (!prof || !prof.length) return false;
+    return Array.isArray(prof[0]) ? prof[0].length >= 2 : prof.length >= 2;
+  }
+
   /* 備品姿図を描く。グループごとに正面図と側面図を並べ、寸法と番号を付ける。
    * 床から1mの位置に基準線を引き、見通し規制(高さ1m)と見比べられるようにする。 */
   function drawFurnViews(ctx, canvas, project) {
@@ -1142,15 +1164,9 @@
         ctx.fillStyle = fill;
         ctx.strokeStyle = line;
         ctx.lineWidth = 1.5;
-        if (v.prof && v.prof.length >= 2) {
-          // シルエット(床からの高さ y を floorY から上に取る)
-          ctx.beginPath();
-          v.prof.forEach((pt, i) => {
-            const s = worldToScreen(v.x0 + pt.x, c.floorY - pt.y);
-            if (i) ctx.lineTo(s.x, s.y); else ctx.moveTo(s.x, s.y);
-          });
-          ctx.closePath();
-          ctx.fill(); ctx.stroke();
+        if (hasProfile(v.prof)) {
+          // シルエット(床からの高さ y を floorY から上に取る)。部品ごとに描く
+          drawProfileShape(ctx, v.prof, v.x0, c.floorY);
         } else {
           const tl = worldToScreen(v.x0, c.floorY - g.height);
           const br = worldToScreen(v.x0 + v.w, c.floorY);

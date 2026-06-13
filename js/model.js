@@ -29,6 +29,185 @@
     tsuitate: { label: 'つい立て',   w: 900,  h: 40,  height: 1500 },
   };
 
+  /* =====================================================================
+   * 備品姿図のプリセット形(正面図・側面図のシルエット)
+   * ---------------------------------------------------------------------
+   * 各カタログ品ごとに「姿図スタイル(variant)」を用意し、椅子なら背もたれ有無、
+   * テーブルなら角/丸 … のように、正面図・側面図の形を選べるようにする。
+   * 形は寸法(幅w・奥行h・高さheight)から毎回その場で作るので、寸法を変えると
+   * 自動で拡大縮小する。返り値は「多角形の配列」(部品ごとに1多角形)。
+   * 座標は x=横位置(0〜幅/奥行), y=床からの高さ(0〜height)。 ===================== */
+
+  /* 床から立つ四角の部品を1つ作る(x0<x1, y0=下端, y1=上端) */
+  function _box(x0, x1, y0, y1) {
+    return [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+  }
+
+  /* 椅子(span=見えている幅, H=高さ, back=背もたれの有無)。正面・側面で共用。 */
+  function _chair(span, H, back, rear) {
+    const legW = Math.max(40, span * 0.12);
+    const seatH = back ? Math.min(H * 0.55, 450) : H;
+    const seatThk = Math.min(70, seatH * 0.2);
+    const parts = [
+      _box(0, legW, 0, seatH - seatThk),               // 手前/左の脚
+      _box(span - legW, span, 0, seatH - seatThk),     // 奥/右の脚
+      _box(0, span, seatH - seatThk, seatH),           // 座面
+    ];
+    if (back) {
+      // 正面=背もたれは幅いっぱい / 側面=後方の縦バー
+      parts.push(rear ? _box(span - legW, span, seatH, H) : _box(0, span, seatH, H));
+    }
+    return parts;
+  }
+
+  /* テーブル(角脚) */
+  function _table(span, H) {
+    const top = Math.min(80, H * 0.12), legW = Math.max(50, span * 0.08), in0 = span * 0.06;
+    return [
+      _box(0, span, H - top, H),                       // 天板
+      _box(in0, in0 + legW, 0, H - top),               // 脚
+      _box(span - in0 - legW, span - in0, 0, H - top), // 脚
+    ];
+  }
+
+  /* テーブル(丸・1本脚) */
+  function _tableRound(span, H) {
+    const top = Math.min(80, H * 0.12), baseH = Math.min(90, H * 0.12);
+    return [
+      _box(0, span, H - top, H),                       // 天板
+      _box(span / 2 - 60, span / 2 + 60, baseH, H - top), // 支柱
+      _box(span * 0.28, span * 0.72, 0, baseH),        // 台座
+    ];
+  }
+
+  /* キャビネット類(カウンター・L字カウンター・シンク)。蹴込み付きの箱。 */
+  function _cabinet(span, H) {
+    const kick = Math.min(100, H * 0.12);
+    return [
+      _box(0, span, kick, H),                          // 本体
+      _box(span * 0.04, span * 0.96, 0, kick),         // 台輪(蹴込み)
+    ];
+  }
+
+  /* ソファ(正面) */
+  function _sofaFront(span, H) {
+    const seatH = Math.min(H * 0.55, 420), arm = Math.max(120, span * 0.1);
+    return [
+      _box(0, span, 0, seatH),                         // 座面ベース
+      _box(0, arm, seatH, H),                          // 左アーム
+      _box(span - arm, span, seatH, H),                // 右アーム
+      _box(arm, span - arm, seatH * 0.6 + seatH * 0.4, H), // 背もたれ
+    ];
+  }
+
+  /* ソファ(側面) */
+  function _sofaSide(depth, H) {
+    const seatH = Math.min(H * 0.55, 420), backT = Math.max(150, depth * 0.18);
+    return [
+      _box(0, depth, 0, seatH),                        // 座面
+      _box(depth - backT, depth, seatH, H),            // 背もたれ
+      _box(0, backT, seatH * 0.5, seatH + (H - seatH) * 0.45), // アーム(手前)
+    ];
+  }
+
+  /* 棚(正面=枠+棚板) */
+  function _shelfFront(span, H) {
+    const post = Math.max(40, span * 0.06), thk = Math.max(40, H * 0.04);
+    const parts = [
+      _box(0, post, 0, H), _box(span - post, span, 0, H),  // 左右の柱
+      _box(0, span, H - thk, H), _box(0, span, 0, thk),    // 天板・底板
+    ];
+    for (let k = 1; k <= 2; k++) {
+      const y = H * k / 3;
+      parts.push(_box(post, span - post, y - thk / 2, y + thk / 2)); // 中棚
+    }
+    return parts;
+  }
+
+  /* 冷蔵庫(正面=本体+仕切り線+取っ手) */
+  function _fridge(span, H) {
+    const split = H * 0.66, hThk = Math.max(30, H * 0.015);
+    return [
+      _box(0, span, 0, H),                                  // 本体
+      _box(0, span, split - hThk / 2, split + hThk / 2),    // 冷凍/冷蔵の仕切り
+      _box(span * 0.8, span * 0.86, H * 0.4, H * 0.62),     // 取っ手
+    ];
+  }
+
+  /* つい立て(正面=パネル+足) */
+  function _tsuitateFront(span, H) {
+    const foot = Math.max(50, H * 0.05);
+    return [
+      _box(span * 0.06, span * 0.94, foot, H),    // パネル
+      _box(0, span * 0.18, 0, foot),              // 左足
+      _box(span * 0.82, span, 0, foot),           // 右足
+    ];
+  }
+
+  const _solid = (span, H) => [_box(0, span, 0, H)]; // ただの箱(側面など)
+  const _none = () => null;                          // 省略(四角で描く)
+
+  /* 種類ごとの姿図スタイル。先頭が既定スタイル。 */
+  const FURNITURE_STYLES = {
+    table: {
+      square: { label: '角テーブル', front: (d) => _table(d.w, d.height), side: (d) => _table(d.h, d.height) },
+      round:  { label: '丸テーブル(1本脚)', front: (d) => _tableRound(d.w, d.height), side: (d) => _tableRound(d.h, d.height) },
+      plain:  { label: '四角(省略)', front: _none, side: _none },
+    },
+    chair: {
+      back:  { label: '背もたれ付き', front: (d) => _chair(d.w, d.height, true, false), side: (d) => _chair(d.h, d.height, true, true) },
+      stool: { label: '背もたれなし(スツール)', front: (d) => _chair(d.w, d.height, false, false), side: (d) => _chair(d.h, d.height, false, true) },
+      plain: { label: '四角(省略)', front: _none, side: _none },
+    },
+    counter: {
+      std:   { label: 'カウンター(蹴込み付き)', front: (d) => _cabinet(d.w, d.height), side: (d) => _cabinet(d.h, d.height) },
+      plain: { label: '四角(省略)', front: _none, side: _none },
+    },
+    counterL: {
+      std:   { label: 'L字カウンター(蹴込み付き)', front: (d) => _cabinet(d.w, d.height), side: (d) => _cabinet(d.h, d.height) },
+      plain: { label: '四角(省略)', front: _none, side: _none },
+    },
+    sofa: {
+      std:   { label: 'アーム付きソファ', front: (d) => _sofaFront(d.w, d.height), side: (d) => _sofaSide(d.h, d.height) },
+      plain: { label: '四角(省略)', front: _none, side: _none },
+    },
+    shelf: {
+      std:   { label: 'オープン棚', front: (d) => _shelfFront(d.w, d.height), side: (d) => _solid(d.h, d.height) },
+      plain: { label: '四角(省略)', front: _none, side: _none },
+    },
+    fridge: {
+      std:   { label: '冷蔵庫(扉・取っ手)', front: (d) => _fridge(d.w, d.height), side: (d) => _solid(d.h, d.height) },
+      plain: { label: '四角(省略)', front: _none, side: _none },
+    },
+    sink: {
+      std:   { label: 'シンク台(蹴込み付き)', front: (d) => _cabinet(d.w, d.height), side: (d) => _cabinet(d.h, d.height) },
+      plain: { label: '四角(省略)', front: _none, side: _none },
+    },
+    tsuitate: {
+      std:   { label: 'つい立て(足付き)', front: (d) => _tsuitateFront(d.w, d.height), side: (d) => _solid(d.h, d.height) },
+      plain: { label: '四角(省略)', front: _none, side: _none },
+    },
+  };
+
+  /* 種類の既定スタイル名(スタイル一覧の先頭)。 */
+  function defaultStyle(kind) {
+    const s = FURNITURE_STYLES[kind];
+    return s ? Object.keys(s)[0] : null;
+  }
+
+  /* 備品 f の姿図プリセット形(view = 'front' | 'side')を作る。
+   * 自由な形(polygon)やスタイル未定義の種類は null(=四角で描く)。 */
+  function furniturePreset(f, view) {
+    if (!f || f.shape === 'polygon') return null;
+    const styles = FURNITURE_STYLES[f.kind];
+    if (!styles) return null;
+    const v = styles[f.variant] || styles[defaultStyle(f.kind)];
+    if (!v) return null;
+    const gen = view === 'side' ? v.side : v.front;
+    const prof = gen ? gen({ w: f.w, h: f.h, height: f.height || 0 }) : null;
+    return prof && prof.length ? prof : null;
+  }
+
   /* 建具・設備カタログ(壁に沿って配置する線状の部品。mm)
    * 扉・戸は開き勝手(flip=左右反転 / swing=内外反転)を持ち、製図記号で描く。 */
   const FITTING_CATALOG = {
@@ -271,7 +450,7 @@
     return project.premise;
   }
 
-  function addFurniture(project, kind) {
+  function addFurniture(project, kind, variant) {
     const c = FURNITURE_CATALOG[kind];
     const item = {
       id: nextId(project, 'f'),
@@ -284,6 +463,9 @@
       rotation: 0,
       height: c.height,
     };
+    // 姿図スタイル(正面図・側面図の形)。未指定なら既定スタイル
+    const ds = defaultStyle(kind);
+    if (ds) item.variant = variant || ds;
     if (c.t) item.t = c.t; // L字カウンター等の厚み
     project.furniture.push(item);
     return item;
@@ -459,6 +641,7 @@
 
   global.Model = {
     REGION_TYPES, FURNITURE_CATALOG, FITTING_CATALOG, DOOR_KINDS, FIXTURE_CATALOG, PAPER_SIZES,
+    FURNITURE_STYLES, defaultStyle, furniturePreset,
     SIGHTLINE_LIMIT, CHECKLIST_ITEMS,
     todayStr, defaultProject, nextId, nextRegionNumber,
     addRegion, addPolygonRegion, normalizePolygon, setPremise,
