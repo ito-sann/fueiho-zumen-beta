@@ -530,14 +530,17 @@
   }
 
   /* メモ・引き出し線を追加する。layer は表示する図面。位置はあとで呼び出し側が決める。 */
-  function addNote(project, layer) {
+  /* メモ(引き出し線つきの注釈)を追加する。
+   * leader=false にすると、引き出し線・矢印のない「コメント(自由テキスト)」になる。 */
+  function addNote(project, layer, leader) {
     const note = {
       id: nextId(project, 'n'),
-      text: 'メモ',
+      text: leader === false ? 'コメント' : 'メモ',
       x: 1500,
       y: 1500,
-      tx: 0,    // 矢印の先端(指したい場所)
+      tx: 0,    // 矢印の先端(指したい場所)。コメント(leader=false)では未使用
       ty: 2500,
+      leader: leader !== false, // false なら引き出し線なしの自由テキスト
       layer: layer || 'plan',
     };
     project.notes = project.notes || [];

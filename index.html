@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.16.0">
+  <link rel="stylesheet" href="css/style.css?v=1.17.0">
 </head>
 <body>
   <header class="topbar">
@@ -157,9 +157,12 @@
       </section>
 
       <section class="group">
-        <h3>メモ・引き出し線</h3>
-        <button id="btnAddNote" class="btn block">メモを追加</button>
-        <p class="muted">いま開いている図面にだけ表示され、PDFにもそのまま印字されます。本文は右の「選択中の要素」で編集、矢印の先端(□)はドラッグで指したい場所へ動かせます。</p>
+        <h3>メモ・コメント</h3>
+        <button id="btnAddNote" class="btn block">メモを追加(引き出し線つき)</button>
+        <button id="btnAddComment" class="btn block">コメントを追加(自由な文字)</button>
+        <p class="muted">どちらも、いま開いている図面にだけ表示され、PDFにもそのまま印字されます。本文は右の「選択中の要素」で編集できます。<br>
+          ・<b>メモ</b>: 矢印つき。先端(□)をドラッグで指したい場所へ。<br>
+          ・<b>コメント</b>: 矢印なしの文字ブロック。本体をドラッグで好きな位置へ動かせます。</p>
       </section>
 
       <section class="group">
@@ -279,12 +282,12 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.16.0"></script>
-  <script src="js/geometry.js?v=1.16.0"></script>
-  <script src="js/render.js?v=1.16.0"></script>
-  <script src="js/interactions.js?v=1.16.0"></script>
-  <script src="js/print.js?v=1.16.0"></script>
-  <script src="js/forms.js?v=1.16.0"></script>
-  <script src="js/main.js?v=1.16.0"></script>
+  <script src="js/model.js?v=1.17.0"></script>
+  <script src="js/geometry.js?v=1.17.0"></script>
+  <script src="js/render.js?v=1.17.0"></script>
+  <script src="js/interactions.js?v=1.17.0"></script>
+  <script src="js/print.js?v=1.17.0"></script>
+  <script src="js/forms.js?v=1.17.0"></script>
+  <script src="js/main.js?v=1.17.0"></script>
 </body>
 </html>

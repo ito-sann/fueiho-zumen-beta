@@ -359,6 +359,18 @@
       refresh();
       showProps(n);
     };
+    // コメント(引き出し線なしの自由テキスト。ドラッグで自由に動かせる)
+    $('btnAddComment').onclick = () => {
+      const n = M.addNote(project, R.getLayer(), false);
+      const c = canvasCss();
+      const center = R.screenToWorld(c.width / 2, c.height / 2);
+      const d = cascade();
+      n.x = I.snap(center.x + d);
+      n.y = I.snap(center.y - 600 + d);
+      state.selectedId = n.id;
+      refresh();
+      showProps(n);
+    };
 
     // 下絵(間取り図のトレース)
     $('btnUnderlay').onclick = () => $('underlayFile').click();
@@ -1089,8 +1101,11 @@
       // どの図面に表示するかをあとから変えられる(矢印の先端はドラッグで移動)
       const lopts = Object.entries(R.LAYERS).map(([k, v]) =>
         `<option value="${k}"${(el.layer || 'plan') === k ? ' selected' : ''}>${v.label}</option>`).join('');
+      const noteHelp = el.leader === false
+        ? '文字ブロックは本体をドラッグで好きな位置へ動かせます。'
+        : '矢印の先端(□)はドラッグで指したい場所へ動かせます。';
       html += `<div class="prop-row"><span>表示する図面</span><select id="propNoteLayer">${lopts}</select></div>
-        <p class="muted">矢印の先端(□)はドラッグで指したい場所へ動かせます。</p>`;
+        <p class="muted">${noteHelp}</p>`;
     }
     if (kind === 'furniture' && el.shape === 'polygon') {
       // 自由な形の備品: 頂点の座標(絶対mm)を1点ずつ編集できる。ドラッグでも修正可
@@ -1336,7 +1351,7 @@
     if (kind === 'premise') return '営業所外周(壁芯)';
     if (kind === 'furniture') return '備品';
     if (kind === 'fittings') return '建具・設備';
-    if (kind === 'notes') return 'メモ・引き出し線';
+    if (kind === 'notes') return el.leader === false ? 'コメント(自由テキスト)' : 'メモ・引き出し線';
     if (kind === 'dimensions') return '寸法線';
     return '照明・音響';
   }

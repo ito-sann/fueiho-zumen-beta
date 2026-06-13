@@ -1231,23 +1231,28 @@
     const p = worldToScreen(n.x, n.y);
     const bw = wMax + pad * 2, bh = lineH * lines.length + pad * 2;
     noteBoxes[n.id] = { w: bw / view.zoom, h: bh / view.zoom };
-    const tip = worldToScreen(n.tx, n.ty);
     const line = opts.selected ? '#d32f2f' : '#37474f';
+    const hasLeader = n.leader !== false; // コメント(自由テキスト)は引き出し線なし
     // 引き出し線(箱の中心から。箱の塗りで内側は隠れる)と先端の矢印
-    const cx = p.x + bw / 2, cy = p.y + bh / 2;
-    ctx.strokeStyle = line;
-    ctx.fillStyle = line;
-    ctx.lineWidth = opts.selected ? 2 : 1.5;
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(tip.x, tip.y); ctx.stroke();
-    const a = Math.atan2(tip.y - cy, tip.x - cx);
-    const head = Math.max(6, fpx * 0.45);
-    ctx.beginPath();
-    ctx.moveTo(tip.x, tip.y);
-    ctx.lineTo(tip.x - head * Math.cos(a - 0.45), tip.y - head * Math.sin(a - 0.45));
-    ctx.lineTo(tip.x - head * Math.cos(a + 0.45), tip.y - head * Math.sin(a + 0.45));
-    ctx.closePath();
-    ctx.fill();
+    if (hasLeader) {
+      const tip = worldToScreen(n.tx, n.ty);
+      const cx = p.x + bw / 2, cy = p.y + bh / 2;
+      ctx.strokeStyle = line;
+      ctx.fillStyle = line;
+      ctx.lineWidth = opts.selected ? 2 : 1.5;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(tip.x, tip.y); ctx.stroke();
+      const a = Math.atan2(tip.y - cy, tip.x - cx);
+      const head = Math.max(6, fpx * 0.45);
+      ctx.beginPath();
+      ctx.moveTo(tip.x, tip.y);
+      ctx.lineTo(tip.x - head * Math.cos(a - 0.45), tip.y - head * Math.sin(a - 0.45));
+      ctx.lineTo(tip.x - head * Math.cos(a + 0.45), tip.y - head * Math.sin(a + 0.45));
+      ctx.closePath();
+      ctx.fill();
+    }
     // 文字の箱
+    ctx.strokeStyle = line;
+    ctx.lineWidth = opts.selected ? 2 : 1.5;
     ctx.fillStyle = 'rgba(255,255,255,0.94)';
     ctx.fillRect(p.x, p.y, bw, bh);
     ctx.strokeRect(p.x, p.y, bw, bh);
@@ -1256,8 +1261,9 @@
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     lines.forEach((l, i) => ctx.fillText(l, p.x + pad, p.y + pad + lineH * i + fpx * 0.12));
-    // 選択中: 先端ハンドル(ドラッグで指す場所を変えられる)
-    if (opts.selected) {
+    // 選択中: 引き出し線つきメモだけ先端ハンドル(ドラッグで指す場所を変えられる)
+    if (opts.selected && hasLeader) {
+      const tip = worldToScreen(n.tx, n.ty);
       ctx.fillStyle = '#fff';
       ctx.strokeStyle = '#d32f2f';
       ctx.lineWidth = 1.5;

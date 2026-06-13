@@ -219,7 +219,7 @@
       // 選択中のメモの矢印の先端をつかんだら、先端の移動モード(どの図面でも)
       if (state.selectedId && !state.draft) {
         const found = global.Model.findById(project, state.selectedId);
-        if (found && found.kind === 'notes') {
+        if (found && found.kind === 'notes' && found.element.leader !== false) {
           const s = global.Render.worldToScreen(found.element.tx, found.element.ty);
           if (Math.hypot(p.x - s.x, p.y - s.y) <= 10) {
             mode = 'notetip';
