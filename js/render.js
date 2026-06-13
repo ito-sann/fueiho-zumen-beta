@@ -562,76 +562,19 @@
     ctx.restore();
   }
 
-  /* 凡例(図面右下): 使われている設備の記号・名称・台数・W数と、
-   * 自由記入のコメント(meta.lightingNote)をまとめて表示する。 */
+  /* 照明・音響設備図の右下: 設備一覧表(記号・設備・数量・W数)と
+   * 自由記入のコメント(meta.lightingNote)を、求積表と同じ白枠の表で描く。 */
   function drawFixtureLegend(ctx, canvas, project) {
     const list = global.Geometry.fixtureSummary(project);
     const note = (project.meta.lightingNote || '').trim();
     if (!list.length && !note) return;
-
-    const rows = list.map((g) =>
-      `${g.label} ${g.count}台${g.watt ? `(${g.watt}W)` : ''}`);
-    const noteLines = note ? note.split('\n') : [];
-    const title = '凡例(照明・音響設備)';
-    // 大きさはすべて実寸基準(図面に対して固定サイズ)
-    const lineH = wpx(380), pad = wpx(200), iconW = wpx(500);
-    const fontN = `${wpx(250)}px sans-serif`;
-    const fontB = `bold ${wpx(250)}px sans-serif`;
-
-    ctx.save();
-    ctx.font = fontN;
-    let wMax = ctx.measureText(title).width;
-    for (const t of rows) wMax = Math.max(wMax, iconW + ctx.measureText(t).width);
-    for (const t of noteLines) wMax = Math.max(wMax, ctx.measureText(t).width);
-    const w = wMax + pad * 2;
-    const lines = 1 + rows.length + noteLines.length;
-    const h = pad * 2 + lineH * lines;
-    const x0 = canvas.width - w - wpx(280);
-    const y0 = canvas.height - h - wpx(280);
-
-    // 枠
-    ctx.fillStyle = 'rgba(255,255,255,0.93)';
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    ctx.fillRect(x0, y0, w, h);
-    ctx.strokeRect(x0, y0, w, h);
-
-    // タイトル
-    ctx.fillStyle = '#222';
-    ctx.font = fontB;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    let y = y0 + pad + lineH / 2;
-    ctx.fillText(title, x0 + pad, y);
-
-    // 設備の行(アイコン + 名称・台数)
-    const iconR = wpx(160);
-    for (let i = 0; i < list.length; i++) {
-      y += lineH;
-      const cx = x0 + pad + iconR, cy = y;
-      ctx.beginPath();
-      ctx.arc(cx, cy, iconR, 0, Math.PI * 2);
-      ctx.fillStyle = '#fff8e1';
-      ctx.fill();
-      ctx.strokeStyle = '#f9a825';
-      ctx.stroke();
-      ctx.fillStyle = '#5d4037';
-      ctx.font = `bold ${wpx(150)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(list[i].symbol, cx, cy);
-      ctx.fillStyle = '#222';
-      ctx.font = fontN;
-      ctx.textAlign = 'left';
-      ctx.fillText(rows[i], x0 + pad + iconW, y);
-    }
-
-    // 自由記入のコメント
-    ctx.fillStyle = '#444';
-    for (const t of noteLines) {
-      y += lineH;
-      ctx.fillText(t, x0 + pad, y);
-    }
-    ctx.restore();
+    const table = list.length ? {
+      title: '照明・音響設備一覧表',
+      cols: ['記号', '設備', '数量', 'W数'],
+      align: ['center', 'left', 'right', 'right'],
+      rows: list.map((g) => [g.symbol, g.label, String(g.count), g.watt ? g.watt : '—']),
+    } : null;
+    drawCornerTables(ctx, canvas, project, table ? [table] : [], note ? note.split('\n') : []);
   }
 
   /* 図面そのものに重ねる求積表のデータを組み立てる。
@@ -738,17 +681,19 @@
     if (t.foot) drawRow(t.foot, ry, true);
   }
 
-  /* 求積表(計算過程)を図面そのものに白枠で重ねて描く。
-   * 用紙枠(無ければ画面)の右下に置き、はみ出す場合は全体を自動縮小して収める。 */
-  function drawKyusekiTable(ctx, canvas, project) {
-    const tables = kyusekiSheetTables(project, currentLayer);
-    if (!tables.length) return;
+  /* 表(と任意のコメント行)を、図面の右下に白枠で重ねて描く共通処理。
+   * 用紙枠(無ければ画面)に収まるよう、はみ出す場合は全体を自動縮小する。
+   * 求積表(計算過程)と照明・音響設備一覧表で共用する。 */
+  function drawCornerTables(ctx, canvas, project, tables, noteLines) {
+    tables = tables || [];
+    noteLines = noteLines || [];
+    if (!tables.length && !noteLines.length) return;
 
     // 基準サイズ(実寸mm→px)。収まらなければ係数 s を掛けて縮める。
     const base = {
       fp: wpx(230), tp: wpx(270), rowH: wpx(360), titleH: wpx(470), cpx: wpx(140),
     };
-    const padIn = wpx(150), gap = wpx(260);
+    const padIn = wpx(150), gap = wpx(260), noteGap = wpx(160);
 
     ctx.save();
     // 各表の列幅・高さを測る
@@ -768,8 +713,16 @@
       return { t, colW, bodyW, h: base.titleH + base.rowH * nrow };
     });
 
-    const W = Math.max.apply(null, layout.map((l) => l.bodyW)) + padIn * 2;
-    const H = layout.reduce((a, l) => a + l.h, 0) + gap * (layout.length - 1) + padIn * 2;
+    // コメント行の幅も測る
+    ctx.font = `${base.fp}px sans-serif`;
+    let noteW = 0;
+    for (const ln of noteLines) noteW = Math.max(noteW, ctx.measureText(ln).width);
+    const noteH = noteLines.length ? noteGap + base.rowH * noteLines.length : 0;
+
+    const tablesW = layout.length ? Math.max.apply(null, layout.map((l) => l.bodyW)) : 0;
+    const tablesH = layout.reduce((a, l) => a + l.h, 0) + gap * Math.max(0, layout.length - 1);
+    const W = Math.max(tablesW, noteW) + padIn * 2;
+    const H = tablesH + noteH + padIn * 2;
 
     // 収める範囲(用紙枠があれば枠、なければ画面全体)
     let avX, avY, avW, avH;
@@ -794,13 +747,27 @@
     ctx.fillRect(x0, y0, w, h);
     ctx.strokeRect(x0, y0, w, h);
 
-    let y = y0 + padIn * s;
     const x = x0 + padIn * s;
+    let y = y0 + padIn * s;
     for (const l of layout) {
       drawOneKyusekiTable(ctx, l, x, y, s, base);
       y += l.h * s + gap * s;
     }
+    // コメント行(設備図の自由記入)。表の下に左そろえで並べる
+    if (noteLines.length) {
+      let ty = y0 + padIn * s + tablesH * s + noteGap * s;
+      ctx.font = `${base.fp * s}px sans-serif`;
+      ctx.fillStyle = '#444';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      for (const ln of noteLines) { ctx.fillText(ln, x, ty); ty += base.rowH * s; }
+    }
     ctx.restore();
+  }
+
+  /* 求積表(計算過程)を図面そのものに白枠で重ねて描く(求積図のみ)。 */
+  function drawKyusekiTable(ctx, canvas, project) {
+    drawCornerTables(ctx, canvas, project, kyusekiSheetTables(project, currentLayer), null);
   }
 
   /* 用紙枠(用紙サイズ×縮尺がカバーする実寸範囲)をワールド座標で返す。
@@ -839,8 +806,8 @@
       `用紙枠 ${m.paper}${orient}(この枠内 = ${(f.w / 1000).toFixed(2)} × ${(f.h / 1000).toFixed(2)} m)`,
       tl.x, tl.y - wpx(90));
     // 右下: スケールバー(黒線の長さ = 図面上の1m)と縮尺表示。各部も実寸基準。
-    // 備品姿図は用紙に収めて出すため縮尺が一定でない。誤解を招くので非表示にする。
-    if (currentLayer !== 'furnviews') {
+    // 備品姿図・照明音響設備図は右下に一覧表を置くため、縮尺バーは非表示にする。
+    if (currentLayer !== 'furnviews' && currentLayer !== 'lighting') {
       const barLen = wpx(1000); // 1m分の画面上の長さ
       const bx2 = br.x - wpx(280), bx1 = bx2 - barLen;
       const by = br.y - wpx(620); // 下のラベルが枠線にかからない高さ
