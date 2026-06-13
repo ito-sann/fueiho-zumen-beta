@@ -339,7 +339,47 @@
     ctx.beginPath(); ctx.moveTo(x, y - t); ctx.lineTo(x, y + t); ctx.stroke();
   }
 
+  /* 自由な形(多角形)の備品を上から見た図として描く。区画の多角形と同じ要領。 */
+  function drawPolygonFurniture(ctx, f, opts) {
+    const pts = polygonScreenPts(f);
+    if (pts.length < 3) return;
+    const over = typeof f.height === 'number' && f.height > global.Model.SIGHTLINE_LIMIT;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.fillStyle = over ? 'rgba(255,205,210,0.7)' : 'rgba(255,255,255,0.85)';
+    ctx.fill();
+    ctx.lineWidth = opts.selected ? 3 : 1.5;
+    ctx.strokeStyle = opts.selected ? '#d32f2f' : (over ? '#c62828' : '#555');
+    ctx.stroke();
+    // ラベル + 番号(①②…)を重心に置く
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    const fpx = fontPx(200, f);
+    const num = opts.num ? global.Geometry.code(opts.num) : '';
+    ctx.fillStyle = '#333';
+    ctx.font = `${fpx}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(f.label + num, cx, cy);
+    // 選択中は頂点ハンドル(ドラッグで形を修正できる)
+    if (opts.selected) {
+      for (const p of pts) {
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#d32f2f';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(p.x - 4, p.y - 4, 8, 8);
+        ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   function drawFurniture(ctx, f, opts) {
+    if (f.shape === 'polygon') { drawPolygonFurniture(ctx, f, opts); return; }
     const p = worldToScreen(f.x, f.y);
     const w = f.w * view.zoom, h = f.h * view.zoom;
     ctx.save();

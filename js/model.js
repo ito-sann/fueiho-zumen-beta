@@ -278,6 +278,30 @@
     return item;
   }
 
+  /* 多角形(自由な形)の備品を追加する。pointsAbs は絶対座標(mm)の頂点列(3点以上)。
+   * 上から見た形(平面)を保持する。高さは既定700mm(あとから変更可)。
+   * 区画の多角形と同じ仕組み(points は原点x,yからの相対mm)。 */
+  function addPolygonFurniture(project, pointsAbs, opts) {
+    opts = opts || {};
+    const xs = pointsAbs.map((p) => p.x), ys = pointsAbs.map((p) => p.y);
+    const minX = Math.min(...xs), minY = Math.min(...ys);
+    const item = {
+      id: nextId(project, 'f'),
+      kind: 'custom',
+      label: opts.label || '備品',
+      shape: 'polygon',
+      x: minX,
+      y: minY,
+      points: pointsAbs.map((p) => ({ x: p.x - minX, y: p.y - minY })),
+      w: Math.max(...xs) - minX,
+      h: Math.max(...ys) - minY,
+      rotation: 0,
+      height: opts.height || 700,
+    };
+    project.furniture.push(item);
+    return item;
+  }
+
   function addFitting(project, kind) {
     const c = FITTING_CATALOG[kind];
     const item = {
@@ -427,7 +451,7 @@
     SIGHTLINE_LIMIT, CHECKLIST_ITEMS,
     todayStr, defaultProject, nextId, nextRegionNumber,
     addRegion, addPolygonRegion, normalizePolygon, setPremise,
-    addFurniture, addFitting, addFixture, addNote, addDimension,
+    addFurniture, addPolygonFurniture, addFitting, addFixture, addNote, addDimension,
     removeById, findById, duplicateElement,
     serialize, deserialize,
   };

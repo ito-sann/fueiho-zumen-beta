@@ -491,6 +491,26 @@
       state.selectedId = f.id;
       refresh(); showProps(f);
     };
+    // 自由な形(多角形)の備品を描く。区画の多角形と同じ操作で上から見た形をなぞる。
+    // 作図中にもう一度押すと: 3点以上なら確定、未満なら中止。
+    $('btnDrawFurnPoly').onclick = () => {
+      if (state.draft) {
+        if (state.draftKind !== 'furniture') return; // 他の作図中は無効
+        if (state.draft.points.length >= 3) I.finishPolygon(state);
+        else I.cancelPolygon(state);
+        draw();
+        return;
+      }
+      if (R.getLayer() === 'furnviews') { R.setLayer('plan'); buildLayerTabs(); }
+      state.draftKind = 'furniture';
+      I.beginPolygon(state, (pts) => {
+        const label = (prompt('備品の名前を入力してください(例: カウンター)', '備品') || '備品').trim() || '備品';
+        const f = M.addPolygonFurniture(project, pts, { label });
+        state.selectedId = f.id;
+        refresh(); showProps(f);
+      });
+      draw();
+    };
     $('btnAddFitting').onclick = () => {
       // 建具・設備は平面図にだけ描かれるので、他の図面からの追加は平面図へ切り替える
       if (!R.visibility(R.getLayer()).fittings) {
@@ -611,16 +631,20 @@
   function setDraftUi(draft) {
     const btnR = $('btnDrawPoly');
     const btnP = $('btnDrawPremise');
+    const btnF = $('btnDrawFurnPoly');
     btnR.textContent = '多角形で描く';
     btnP.textContent = '外周を多角形で描く';
+    btnF.textContent = '自由な形で描く(真上から)';
     btnR.classList.remove('danger');
     btnP.classList.remove('danger');
+    btnF.classList.remove('danger');
     if (!draft) {
       state.draftKind = null;
       $('hint').textContent = HINT_DEFAULT;
       return;
     }
-    const btn = state.draftKind === 'premise' ? btnP : btnR;
+    const btn = state.draftKind === 'premise' ? btnP
+      : state.draftKind === 'furniture' ? btnF : btnR;
     if (draft.points.length >= 3) {
       btn.textContent = '作図を確定';
     } else {
@@ -1001,7 +1025,16 @@
       html += `<div class="prop-row"><span>表示する図面</span><select id="propNoteLayer">${lopts}</select></div>
         <p class="muted">矢印の先端(□)はドラッグで指したい場所へ動かせます。</p>`;
     }
-    if (kind === 'furniture' || kind === 'fittings') {
+    if (kind === 'furniture' && el.shape === 'polygon') {
+      // 自由な形の備品: 頂点の座標(絶対mm)を1点ずつ編集できる。ドラッグでも修正可
+      html += '<div class="prop-row"><span>形</span><b>自由な形(多角形)</b></div>';
+      html += '<p class="muted">頂点はキャンバス上でドラッグでも動かせます。</p>';
+      el.points.forEach((p, i) => {
+        html += `<div class="prop-row vertex-row"><span>P${i + 1}</span>
+          <input type="number" step="10" data-vx="${i}" value="${el.x + p.x}" title="X(mm)">
+          <input type="number" step="10" data-vy="${i}" value="${el.y + p.y}" title="Y(mm)"></div>`;
+      });
+    } else if (kind === 'furniture' || kind === 'fittings') {
       html += propNum(kind === 'fittings' ? '長さ(mm)' : '幅(mm)', 'w', el.w);
       html += propNum(kind === 'fittings' ? '厚み(mm)' : '奥行(mm)', 'h', el.h);
       if (el.kind === 'counterL') {

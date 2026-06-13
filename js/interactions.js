@@ -133,7 +133,9 @@
       if (inRotatedRect(wx, wy, fittings[i])) return fittings[i];
     }
     for (let i = project.furniture.length - 1; i >= 0; i--) {
-      if (inRotatedRect(wx, wy, project.furniture[i])) return project.furniture[i];
+      const f = project.furniture[i];
+      const hit = f.shape === 'polygon' ? inPolygon(wx, wy, f) : inRotatedRect(wx, wy, f);
+      if (hit) return f;
     }
     for (let i = project.regions.length - 1; i >= 0; i--) {
       const r = project.regions[i];
@@ -172,8 +174,8 @@
     function findVertexAt(p) {
       if (!state.selectedId) return null;
       const found = global.Model.findById(project, state.selectedId);
-      if (!found || (found.kind !== 'regions' && found.kind !== 'premise') ||
-          found.element.shape !== 'polygon') return null;
+      if (!found || found.element.shape !== 'polygon' ||
+          (found.kind !== 'regions' && found.kind !== 'premise' && found.kind !== 'furniture')) return null;
       const r = found.element;
       for (let i = 0; i < r.points.length; i++) {
         const s = global.Render.worldToScreen(r.x + r.points[i].x, r.y + r.points[i].y);

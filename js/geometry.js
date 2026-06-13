@@ -314,7 +314,9 @@
     const variant = new Map(); // 種類|幅|奥行|高さ → 番号
     const map = {};
     for (const f of project.furniture) {
-      const key = `${f.kind}|${f.w}|${f.h}|${f.height || 0}`;
+      const key = f.shape === 'polygon'
+        ? `custom|${f.label}|${f.height || 0}|${JSON.stringify(f.points)}`
+        : `${f.kind}|${f.w}|${f.h}|${f.height || 0}`;
       if (!variant.has(key)) {
         counters[f.kind] = (counters[f.kind] || 0) + 1;
         variant.set(key, counters[f.kind]);
@@ -330,12 +332,16 @@
     const counters = {};
     const map = new Map();
     for (const f of project.furniture) {
-      const key = `${f.kind}|${f.w}|${f.h}|${f.height || 0}`;
+      // 自由な形は外形寸法が同じでも形が違えば別物として扱う(形+ラベルで区別)
+      const key = f.shape === 'polygon'
+        ? `custom|${f.label}|${f.height || 0}|${JSON.stringify(f.points)}`
+        : `${f.kind}|${f.w}|${f.h}|${f.height || 0}`;
       if (!map.has(key)) {
         counters[f.kind] = (counters[f.kind] || 0) + 1;
         map.set(key, {
           kind: f.kind, label: f.label,
           w: f.w, h: f.h, height: f.height || 0,
+          shape: f.shape || 'rect', points: f.points || null,
           number: counters[f.kind], count: 0,
           over: (f.height || 0) > limit, // 高さ1m超(見通し規制の注意対象)
         });
