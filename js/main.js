@@ -512,15 +512,16 @@
       draw();
     };
     $('btnAddFitting').onclick = () => {
-      // 建具・設備は平面図にだけ描かれるので、他の図面からの追加は平面図へ切り替える
-      if (!R.visibility(R.getLayer()).fittings) {
-        R.setLayer('plan');
-        buildLayerTabs();
-      }
+      // 図面は切り替えない(勝手に平面図へ戻らないようにする)。
+      // 建具・設備は平面図に描かれるが、求積図などで追加してもその図面のまま作業を続けられる。
       const g = M.addFitting(project, $('fittingKind').value);
       placeAtViewCenter(g);
       state.selectedId = g.id;
       refresh(); showProps(g);
+      // いまの図面に描かれない種類のときだけ、どこで見えるかを一言だけ知らせる
+      if (!R.visibility(R.getLayer()).fittings) {
+        $('hint').textContent = `「${g.label}」を追加しました（平面図に表示されます）。`;
+      }
     };
     $('btnAddFix').onclick = () => {
       const x = M.addFixture(project, $('fixKind').value);
