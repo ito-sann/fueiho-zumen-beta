@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.12.0">
+  <link rel="stylesheet" href="css/style.css?v=1.13.0">
 </head>
 <body>
   <header class="topbar">
@@ -120,6 +120,12 @@
         </label>
         <button id="btnDrawFurnPoly" class="btn block">自由な形で描く(真上から)</button>
         <p class="muted">クリックで角を置いて、テーブル・カウンター等を上から見た形でなぞれます。L字や変形の形もOK。最初の点をクリック・ダブルクリック・Enterで確定。</p>
+      </section>
+
+      <section class="group" data-layers="furnviews">
+        <h3>姿図の配置</h3>
+        <button id="btnFurnReset" class="btn block">自動整列に戻す</button>
+        <p class="muted">備品姿図では、各備品の図をドラッグで好きな位置へ動かせます(用紙からはみ出すときの整理用)。バラバラになったら、このボタンで元の自動整列に戻せます。</p>
       </section>
 
       <section class="group" data-layers="plan premises kyakushitsu">
@@ -273,12 +279,12 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.12.0"></script>
-  <script src="js/geometry.js?v=1.12.0"></script>
-  <script src="js/render.js?v=1.12.0"></script>
-  <script src="js/interactions.js?v=1.12.0"></script>
-  <script src="js/print.js?v=1.12.0"></script>
-  <script src="js/forms.js?v=1.12.0"></script>
-  <script src="js/main.js?v=1.12.0"></script>
+  <script src="js/model.js?v=1.13.0"></script>
+  <script src="js/geometry.js?v=1.13.0"></script>
+  <script src="js/render.js?v=1.13.0"></script>
+  <script src="js/interactions.js?v=1.13.0"></script>
+  <script src="js/print.js?v=1.13.0"></script>
+  <script src="js/forms.js?v=1.13.0"></script>
+  <script src="js/main.js?v=1.13.0"></script>
 </body>
 </html>

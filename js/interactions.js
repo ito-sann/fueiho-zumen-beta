@@ -240,7 +240,7 @@
         return;
       }
 
-      // 備品姿図は一覧表示専用: メモ以外はパンとズームだけにする
+      // 備品姿図: メモのドラッグ → 備品カードのドラッグ → それ以外はパン
       if (global.Render.getLayer() === 'furnviews' && !state.draft) {
         const n = noteAt(project, w.x, w.y);
         if (n) {
@@ -251,7 +251,15 @@
           onSelect(n);
           onChange();
         } else {
-          mode = 'pan';
+          // 各備品の姿図カードはドラッグで好きな位置へ動かせる
+          const card = global.Render.furnCardAt(project, w.x, w.y);
+          if (card) {
+            mode = 'furncard';
+            dragTarget = card; // { key, x, y, ... }
+            grabOffset = { x: w.x - card.x, y: w.y - card.y };
+          } else {
+            mode = 'pan';
+          }
         }
         last = p;
         return;
@@ -376,6 +384,14 @@
         if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); }
         dragTarget.tx = nx;
         dragTarget.ty = ny;
+        onChange();
+      } else if (mode === 'furncard' && dragTarget) {
+        // 備品姿図のカードを動かす(動かした位置を meta に記録)。スナップあり・Shiftで自由
+        const w = global.Render.screenToWorld(p.x, p.y);
+        let nx = w.x - grabOffset.x, ny = w.y - grabOffset.y;
+        if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); }
+        if (!project.meta.furnViewPos) project.meta.furnViewPos = {};
+        project.meta.furnViewPos[dragTarget.key] = { x: nx, y: ny };
         onChange();
       } else if (mode === 'underlay' && project.underlay) {
         // 下絵の移動(スナップあり・Shiftで自由)

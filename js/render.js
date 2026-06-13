@@ -1032,14 +1032,34 @@
     const originY = (frame ? frame.y : 0) + TITLE_H;
     // 1行に詰め込める右端。1品が単独で超える場合はその品の幅を許容
     const cardW = (g) => PAD * 2 + (g.w + INNER_GAP + g.h) + HDIM_W;
+    const figH = (g) => Math.max(g.height || 0, 400);          // 図の高さ
+    const cardH1 = (g) => PAD * 2 + LABEL_H + figH(g) + CAP_H;  // カード単体の高さ
     const maxCardW = groups.reduce((m, g) => Math.max(m, cardW(g)), 0);
     const availW = frame ? Math.max(maxCardW, frame.w - MARGIN * 2) : 14000;
 
-    // 横に流し込み、用紙幅を超えたら折り返す(フロー配置)。
-    // 行内は床(ベースライン)をそろえ、カード高さも行内で統一する。
     const cells = [];
+    let maxRight = originX, maxBottom = originY;
+    const manualPos = project.meta.furnViewPos || {};
+
+    // 1) ドラッグで動かしたカードは手動位置に置き、自動整列からは外す
+    const autoGroups = [];
+    for (const g of groups) {
+      const p = manualPos[g.key];
+      if (p) {
+        const h = cardH1(g);
+        cells.push({ g, x: p.x, y: p.y, cellW: cardW(g), cellH: h,
+                     contentW: g.w + INNER_GAP + g.h,
+                     floorY: p.y + PAD + LABEL_H + figH(g), manual: true });
+        maxRight = Math.max(maxRight, p.x + cardW(g));
+        maxBottom = Math.max(maxBottom, p.y + h);
+      } else {
+        autoGroups.push(g);
+      }
+    }
+
+    // 2) 残りは横に流し込み、用紙幅を超えたら折り返す(フロー配置)。
+    // 行内は床(ベースライン)をそろえ、カード高さも行内で統一する。
     let x = originX, rowTop = originY, rowMaxFigH = 0, row = [];
-    let maxRight = originX;
     const flushRow = () => {
       if (!row.length) return;
       const cardH = PAD * 2 + LABEL_H + rowMaxFigH + CAP_H;
@@ -1049,7 +1069,7 @@
       rowTop += cardH + ROW_GAP;
       x = originX; rowMaxFigH = 0; row = [];
     };
-    for (const g of groups) {
+    for (const g of autoGroups) {
       const cw = cardW(g);
       if (row.length && x + cw > originX + availW) flushRow();
       const cell = { g, x, cellW: cw, contentW: g.w + INNER_GAP + g.h };
@@ -1058,15 +1078,29 @@
       rowMaxFigH = Math.max(rowMaxFigH, g.height || 0, 400);
     }
     flushRow();
+    maxBottom = Math.max(maxBottom, rowTop - ROW_GAP);
 
-    const bottom = rowTop - ROW_GAP;
     const bounds = {
       x: 0, y: 0,
       w: Math.max(maxRight + MARGIN, frame ? frame.x + frame.w : 0) + (frame ? MARGIN : 0),
-      h: Math.max(bottom + MARGIN, frame ? frame.y + frame.h : 0) + (frame ? MARGIN : 0),
+      h: Math.max(maxBottom + MARGIN, frame ? frame.y + frame.h : 0) + (frame ? MARGIN : 0),
     };
     return { cells, pad: PAD, innerGap: INNER_GAP, capH: CAP_H,
              labelH: LABEL_H, bounds };
+  }
+
+  /* 備品姿図のカードの当たり判定。世界座標(wx,wy)上にあるカードのグループキーと
+   * 枠の位置を返す。ドラッグ移動に使う。後から描いたカードを優先する。 */
+  function furnCardAt(project, wx, wy) {
+    if (currentLayer !== 'furnviews') return null;
+    const layout = furnViewLayout(project);
+    for (let i = layout.cells.length - 1; i >= 0; i--) {
+      const c = layout.cells[i];
+      if (wx >= c.x && wx <= c.x + c.cellW && wy >= c.y && wy <= c.y + c.cellH) {
+        return { key: c.g.key, x: c.x, y: c.y, cellW: c.cellW, cellH: c.cellH };
+      }
+    }
+    return null;
   }
 
   /* 姿図のシルエットを描く。prof は1多角形({x,y}の配列)でも、
@@ -1491,6 +1525,6 @@
   global.Render = {
     view, LAYERS, setLayer, getLayer, visibility,
     worldToScreen, screenToWorld, fitToView, render,
-    paperFrameWorld, getNorthMark, setRedrawCallback, noteBox, furnViewLayout,
+    paperFrameWorld, getNorthMark, setRedrawCallback, noteBox, furnViewLayout, furnCardAt,
   };
 })(window);

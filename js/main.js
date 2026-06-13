@@ -487,6 +487,8 @@
     };
     // 種類を変えたら、その種類で選べる姿図スタイルに並べ替える
     $('furnKind').onchange = populateFurnStyles;
+    // 備品姿図のカードを自動整列に戻す(手動で動かした位置をすべて消す)
+    $('btnFurnReset').onclick = () => { project.meta.furnViewPos = {}; refresh(); };
     $('btnAddFurn').onclick = () => {
       if (R.getLayer() === 'furnviews') { R.setLayer('plan'); buildLayerTabs(); } // 姿図では配置できない
       const f = M.addFurniture(project, $('furnKind').value, $('furnStyle').value || undefined);
