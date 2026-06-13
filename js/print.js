@@ -140,6 +140,28 @@
       </table>`;
   }
 
+  /* 日付文字列(YYYY-MM-DD)から「西暦末尾2桁+月2桁」を作る。
+   * 例: 2026-07-01 → 2607。値が不正なら今日の日付から作る。 */
+  function dateCode(dateStr) {
+    let y, mo;
+    const mt = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr || '');
+    if (mt) { y = mt[1]; mo = mt[2]; }
+    else {
+      const d = new Date();
+      y = String(d.getFullYear());
+      mo = String(d.getMonth() + 1).padStart(2, '0');
+    }
+    return y.slice(-2) + mo;
+  }
+
+  /* PDFのファイル名(印刷ウィンドウのタイトル=保存時の初期ファイル名)を組み立てる。
+   * 形式: 2607_店舗名_図面名(2607 = 西暦末尾2桁+月)。
+   * 店舗名が空のときは省いて 2607_図面名 とする。 */
+  function fileTitle(project, drawingName) {
+    const store = (project.meta.storeName || '').trim();
+    return [dateCode(project.meta.date), store, drawingName].filter(Boolean).join('_');
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => (
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -301,7 +323,7 @@ ${bodyHtml}
     const layer = global.Render.getLayer();
     const drawingName = global.Render.LAYERS[layer].label;
     const img = renderLayerImage(project, layer);
-    const title = `${drawingName} - ${project.meta.storeName || ''}`;
+    const title = fileTitle(project, drawingName);
     openWindow(project, title, sheetHtml(project, layer, img));
   }
 
@@ -312,7 +334,7 @@ ${bodyHtml}
     const body = layers
       .map((layer) => sheetHtml(project, layer, renderLayerImage(project, layer)))
       .join('\n');
-    const title = `図面一式 - ${project.meta.storeName || ''}`;
+    const title = fileTitle(project, '図面一式');
     openWindow(project, title, body);
   }
 
