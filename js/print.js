@@ -146,16 +146,41 @@
     ));
   }
 
-  /* 1枚分の図面シート(図 + 求積表 + 表題欄) */
+  /* 用紙の印刷可能サイズ(mm)。実寸縮尺のはみ出し判定に使う。 */
+  function printableSize(project) {
+    const m = project.meta;
+    const p = global.Model.PAPER_SIZES[m.paper] || global.Model.PAPER_SIZES.A4;
+    const landscape = m.orientation !== 'portrait';
+    const margin = 8; // @page の余白(mm)と揃える
+    return { w: (landscape ? p.w : p.h) - margin * 2, h: (landscape ? p.h : p.w) - margin * 2 };
+  }
+
+  /* 1枚分の図面シート(図 + 求積表 + 表題欄)。
+   * img は renderLayerImage の戻り値 {dataURL, wMm, hMm}。
+   * wMm が入っていれば実寸縮尺(その物理サイズで貼り付け)。 */
   function sheetHtml(project, layer, img) {
     const drawingName = global.Render.LAYERS[layer].label;
+    let imgTag, warn = '';
+    if (img.wMm) {
+      // 実寸縮尺: 画像をミリ指定の物理サイズで貼る(印刷倍率100%で1/縮尺になる)
+      imgTag = `<img class="scaled" src="${img.dataURL}" style="width:${img.wMm.toFixed(1)}mm;height:${img.hMm.toFixed(1)}mm">`;
+      const ps = printableSize(project);
+      if (img.wMm > ps.w + 1 || img.hMm > ps.h + 1) {
+        warn = `<p class="scale-warn">⚠ この縮尺(1/${project.meta.scale})では図面が用紙(${project.meta.paper})に収まりません
+          (必要 ${img.wMm.toFixed(0)}×${img.hMm.toFixed(0)}mm / 印刷可能 ${ps.w}×${ps.h}mm)。
+          用紙をA3にするか、縮尺を1/100にしてください。</p>`;
+      }
+    } else {
+      imgTag = `<img src="${img.dataURL}">`;
+    }
     return `
 <div class="sheet">
   <div class="head">
     <h1>${escapeHtml(drawingName)}</h1>
-    <div class="scale">縮尺 1/${project.meta.scale}</div>
+    <div class="scale">縮尺 1/${project.meta.scale}${img.wMm ? '(実寸)' : ''}</div>
   </div>
-  <div class="drawing"><img src="${img}"></div>
+  ${warn}
+  <div class="drawing">${imgTag}</div>
   <div class="bottom">
     <div style="flex:1">${tablesForLayer(project, layer)}</div>
     <div style="flex:1">${titleBlockHtml(project, drawingName)}</div>
@@ -172,6 +197,11 @@
     }
     const landscape = project.meta.orientation === 'landscape';
     const size = project.meta.paper + (landscape ? ' landscape' : ' portrait');
+    // 実寸縮尺のときは、印刷倍率100%(実際のサイズ)で出すよう案内する
+    const scaleNotice = project.meta.printTrueScale
+      ? '<div class="noprint scale-note">⚠ 実寸の縮尺で出力します。印刷ダイアログの倍率は「100%(実際のサイズ/拡大縮小なし)」にしてください。定規で測ると図面が1/' +
+        project.meta.scale + 'になります。</div>'
+      : '';
 
     win.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
 <title>${escapeHtml(title)}</title>
@@ -186,6 +216,8 @@
   .head .scale { font-size: 11pt; }
   .drawing { text-align: center; }
   .drawing img { max-width: 100%; max-height: 145mm; border: 1px solid #ccc; }
+  .drawing img.scaled { max-width: none; max-height: none; } /* 実寸縮尺は物理サイズ指定を優先 */
+  .scale-warn { color: #b91c1c; font-weight: bold; font-size: 9pt; margin: 0 0 2mm; }
   .bottom { display: flex; gap: 6mm; margin-top: 4mm; align-items: flex-start; }
   table { border-collapse: collapse; font-size: 9pt; }
   .kyuseki { width: 100%; margin-bottom: 3mm; }
@@ -199,11 +231,14 @@
   @media print { .noprint { display: none; } }
   .noprint { text-align: center; padding: 8px; }
   .noprint button { font-size: 13px; padding: 6px 16px; cursor: pointer; }
+  .scale-note { background: #fff8e1; border-left: 4px solid #f59e0b; color: #7c4a03;
+    text-align: left; font-size: 12px; line-height: 1.6; padding: 8px 12px; margin: 0 8px 8px; }
 </style></head><body>
 <div class="noprint">
   <button onclick="window.print()">印刷 / PDFに保存</button>
   <button onclick="window.close()">閉じる</button>
 </div>
+${scaleNotice}
 ${bodyHtml}
 </body></html>`);
     win.document.close();
@@ -211,24 +246,52 @@ ${bodyHtml}
   }
 
   /* 指定レイヤーをオフスクリーンの canvas に描画して画像にする。
-   * Render のビュー・レイヤーは共有状態なので、描画後に元へ戻す。 */
-  function renderLayerImage(project, layer, w, h) {
+   * Render のビュー・レイヤーは共有状態なので、描画後に元へ戻す。
+   * 戻り値 {dataURL, wMm, hMm}。実寸縮尺のときだけ wMm/hMm に物理サイズ(mm)が入る。 */
+  function renderLayerImage(project, layer) {
     const R = global.Render;
     const prevLayer = R.getLayer();
     const v = R.view;
     const prev = { zoom: v.zoom, offsetX: v.offsetX, offsetY: v.offsetY };
-
-    const cv = document.createElement('canvas');
-    cv.width = w; cv.height = h;
-    const ctx = cv.getContext('2d');
     R.setLayer(layer);
-    R.fitToView(project, cv);
-    // print: true … 下絵(トレース用画像)は提出書類に含めない
-    R.render(ctx, cv, project, { selectedId: null }, { print: true });
+
+    // 備品姿図は実寸の図面ではない(模式図)ので、実寸縮尺の対象外
+    const trueScale = project.meta.printTrueScale && layer !== 'furnviews';
+    let out;
+    if (trueScale) {
+      // 用紙枠は実寸計算に含めない(枠の分だけ余計に大きくならないように一時的に消す)
+      const savedFrame = project.meta.showPaperFrame;
+      project.meta.showPaperFrame = false;
+      const bb0 = global.Geometry.boundingBox(project);
+      const mg = 400; // 図面まわりの余白(mm)
+      const bb = { x: bb0.x - mg, y: bb0.y - mg, w: bb0.w + mg * 2, h: bb0.h + mg * 2 };
+      const longPx = 2400; // 画素の長辺(印刷の鮮明さ)
+      const cw = bb.w >= bb.h ? longPx : Math.round(longPx * bb.w / bb.h);
+      const ch = bb.w >= bb.h ? Math.round(longPx * bb.h / bb.w) : longPx;
+      const cv = document.createElement('canvas');
+      cv.width = cw; cv.height = ch;
+      const ctx = cv.getContext('2d');
+      // 矩形 bb をキャンバスにぴったり対応させる(余白なし=実寸が正確になる)
+      v.zoom = cw / bb.w;
+      v.offsetX = -bb.x * v.zoom;
+      v.offsetY = -bb.y * v.zoom;
+      R.render(ctx, cv, project, { selectedId: null }, { print: true });
+      project.meta.showPaperFrame = savedFrame;
+      const scale = project.meta.scale || 50;
+      out = { dataURL: cv.toDataURL('image/png'), wMm: bb.w / scale, hMm: bb.h / scale };
+    } else {
+      const cv = document.createElement('canvas');
+      cv.width = 1600; cv.height = 1100;
+      const ctx = cv.getContext('2d');
+      R.fitToView(project, cv);
+      // print: true … 下絵(トレース用画像)は提出書類に含めない
+      R.render(ctx, cv, project, { selectedId: null }, { print: true });
+      out = { dataURL: cv.toDataURL('image/png'), wMm: null, hMm: null };
+    }
 
     R.setLayer(prevLayer);
     v.zoom = prev.zoom; v.offsetX = prev.offsetX; v.offsetY = prev.offsetY;
-    return cv.toDataURL('image/png');
+    return out;
   }
 
   /* 現在の図面(レイヤー)を印刷する。
@@ -237,7 +300,7 @@ ${bodyHtml}
   function printCurrent(project, canvas) {
     const layer = global.Render.getLayer();
     const drawingName = global.Render.LAYERS[layer].label;
-    const img = renderLayerImage(project, layer, 1600, 1100);
+    const img = renderLayerImage(project, layer);
     const title = `${drawingName} - ${project.meta.storeName || ''}`;
     openWindow(project, title, sheetHtml(project, layer, img));
   }
@@ -247,7 +310,7 @@ ${bodyHtml}
   function printAll(project) {
     const layers = Object.keys(global.Render.LAYERS);
     const body = layers
-      .map((layer) => sheetHtml(project, layer, renderLayerImage(project, layer, 1600, 1100)))
+      .map((layer) => sheetHtml(project, layer, renderLayerImage(project, layer)))
       .join('\n');
     const title = `図面一式 - ${project.meta.storeName || ''}`;
     openWindow(project, title, body);

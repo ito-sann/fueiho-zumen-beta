@@ -42,10 +42,37 @@
     return project.regions.filter((r) => r.type === 'kyakushitsu').length;
   }
 
-  /* 各客室の床面積を「客室1: 9.72㎡」形式で列挙する */
+  /* 各客室の床面積を「客室1: 9.72㎡」形式で列挙する(柱控除があれば控除後の面積) */
   function kyakushitsuListText(project) {
-    const table = global.Geometry.buildTable(project, ['kyakushitsu']);
-    return table.rows.map((r) => `${r.label}: ${r.area.toFixed(2)}㎡`).join('、');
+    return project.regions
+      .filter((r) => r.type === 'kyakushitsu')
+      .map((r) => `${r.label}: ${global.Geometry.regionNetAreaSqm(project, r).toFixed(2)}㎡`)
+      .join('、');
+  }
+
+  /* 営業所の床面積。求積方式(壁芯/内法)に合わせた値を返す。 */
+  function premisesAreaSqm(project) {
+    const method = project.meta.premisesMethod || 'regions';
+    if (method === 'centerline' && project.premise) {
+      return global.Geometry.premiseCalc(project.premise).total;
+    }
+    return global.Geometry.summary(project).premises; // 内法(区画合計)
+  }
+
+  /* 全国47都道府県(所在地から公安委員会の宛先を自動推定するための一覧) */
+  const PREFECTURES = [
+    '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+    '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+    '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
+    '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
+    '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
+    '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
+    '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
+  ];
+  /* 所在地の文字列から先頭の都道府県名を取り出す(見つからなければ空) */
+  function prefectureOf(address) {
+    const a = String(address || '');
+    return PREFECTURES.find((p) => a.indexOf(p) === 0) || '';
   }
 
   /* fixtures を指定した kind 群で絞り込み、種類ごとに
@@ -79,7 +106,9 @@
    * ------------------------------------------------------------------- */
   function form47Html(project) {
     const m = project.meta;
+    const t = m.todokede || {};
     const sum = global.Geometry.summary(project);
+    const addressee = t.addressee || prefectureOf(m.address);
 
     // 音響設備(スピーカー・モニター・カラオケ)とそれ以外(=照明)に分けて集計する。
     // 照明はカタログから自動で拾うので、種類を追加してもここの修正は不要。
@@ -94,14 +123,15 @@
   <h1>深夜における酒類提供飲食店営業営業開始届出書</h1>
 
   <p class="date-line">届出年月日 ${fill(todayWareki(), '40mm')}</p>
-  <p class="addressee">${fill('', '20mm')}公安委員会 殿</p>
+  <p class="addressee">${fill(addressee, '30mm')}公安委員会 殿</p>
 
   <div class="todokede-sha">
     <p class="todokede-title">届出者</p>
-    <div class="row"><span class="lbl">住　　所</span>${fill('', '70mm')}</div>
-    <div class="row"><span class="lbl">氏　　名</span>${fill('', '70mm')}</div>
+    <div class="row"><span class="lbl">住　　所</span>${fill(t.applicantAddress, '70mm')}</div>
+    <div class="row"><span class="lbl">氏　　名</span>${fill(t.applicantName, '70mm')}</div>
     <div class="note">（法人にあっては名称及び代表者の氏名）</div>
-    <div class="row"><span class="lbl">電話番号</span>${fill('', '50mm')}</div>
+    ${t.corpRepName ? `<div class="row"><span class="lbl">代表者氏名</span>${fill(t.corpRepName, '50mm')}</div>` : ''}
+    <div class="row"><span class="lbl">電話番号</span>${fill(t.phone, '50mm')}</div>
   </div>
 
   <p class="honbun">　風俗営業等の規制及び業務の適正化等に関する法律第33条第1項の規定により、深夜において酒類提供飲食店営業を営みたいので、次のとおり届出をします。</p>
@@ -111,7 +141,7 @@
       <th>営業所の名称<br><span class="small">（ふりがな）</span></th>
       <td>
         ${fill(m.storeName, '70mm')}<br>
-        <span class="small">ふりがな: ${fill('', '70mm')}</span>
+        <span class="small">ふりがな: ${fill(t.applicantKana, '70mm')}</span>
       </td>
     </tr>
     <tr>
@@ -120,11 +150,11 @@
     </tr>
     <tr>
       <th>建物の構造</th>
-      <td>${fill('', '100mm')}<br><span class="small">（例: 鉄筋コンクリート造○階建○階部分）</span></td>
+      <td>${fill(t.buildingStructure, '100mm')}<br><span class="small">（例: 鉄筋コンクリート造○階建○階部分）</span></td>
     </tr>
     <tr>
       <th>建物内の営業所の位置</th>
-      <td>${fill('', '100mm')}</td>
+      <td>${fill(t.buildingPosition, '100mm')}</td>
     </tr>
     <tr>
       <th>客室数</th>
@@ -132,7 +162,7 @@
     </tr>
     <tr>
       <th>営業所の床面積</th>
-      <td>${fill(sum.premises.toFixed(2), '25mm')} ㎡</td>
+      <td>${fill(premisesAreaSqm(project).toFixed(2), '25mm')} ㎡</td>
     </tr>
     <tr>
       <th>客室の総床面積</th>
@@ -153,8 +183,8 @@
     <tr>
       <th>飲食店営業許可</th>
       <td>
-        許可年月日: ${fill('', '40mm')}<br>
-        許可番号: ${fill('', '40mm')}
+        許可年月日: ${fill(t.licenseDate, '40mm')}<br>
+        許可番号: ${fill(t.licenseNumber, '40mm')}
       </td>
     </tr>
   </table>
@@ -166,6 +196,7 @@
    * ------------------------------------------------------------------- */
   function form48Html(project) {
     const m = project.meta;
+    const t = m.todokede || {};
 
     // 主な提供飲食物の表(初期は空行4行)
     let menuRows = '';
@@ -188,19 +219,19 @@
     </tr>
     <tr>
       <th>営業時間</th>
-      <td>${fill('午後6時から翌日午前2時まで', '90mm')}</td>
+      <td>${fill(t.businessHours || '午後6時から翌日午前2時まで', '90mm')}</td>
     </tr>
     <tr>
       <th>酒類の提供方法</th>
-      <td>${fill('客の注文により座席で提供する', '100mm')}</td>
+      <td>${fill(t.alcoholMethod || '客の注文により座席で提供する', '100mm')}</td>
     </tr>
     <tr>
       <th>18歳未満の者の立入りに関する事項</th>
-      <td>${fill('18歳未満の者は午後10時以降立ち入らせない', '100mm')}</td>
+      <td>${fill(t.minorRule || '18歳未満の者は午後10時以降立ち入らせない', '100mm')}</td>
     </tr>
     <tr>
       <th>当該営業に従事する者の数</th>
-      <td>${fill('', '15mm')} 名</td>
+      <td>${fill(t.staffCount, '15mm')} 名</td>
     </tr>
     <tr>
       <th>主な提供飲食物とその料金</th>

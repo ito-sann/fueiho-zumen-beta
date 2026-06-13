@@ -116,6 +116,28 @@
         colorMode: 'mono',
         /* 柱の面積を、柱が立っている区画(客室・調理場など)の面積から差し引くか */
         deductPillars: false,
+        /* PDFを実寸の縮尺(定規で測って正確に1/縮尺)で印刷するか。
+         * false のときは従来どおり用紙に収まるよう自動調整して印刷する。 */
+        printTrueScale: false,
+        /* 届出書(様式第47号・第48号)の下書きに自動転記する情報。
+         * 図面から導けない項目(届出者・建物・営業の方法など)をここに保存して、
+         * 入力すれば両様式へ自動で埋まる。案件ごとに自動保存される。 */
+        todokede: {
+          applicantAddress: '',  // 届出者の住所
+          applicantName: '',     // 届出者の氏名(法人なら名称)
+          applicantKana: '',     // 営業所名称のふりがな
+          corpRepName: '',       // 法人の代表者氏名
+          phone: '',             // 電話番号
+          addressee: '',         // ○○公安委員会(空なら所在地から自動推定)
+          buildingStructure: '', // 建物の構造
+          buildingPosition: '',  // 建物内の営業所の位置
+          businessHours: '午後6時から翌日午前2時まで',
+          staffCount: '',        // 従事者数
+          alcoholMethod: '客の注文により座席で提供する',
+          minorRule: '18歳未満の者は午後10時以降立ち入らせない',
+          licenseDate: '',       // 飲食店営業許可の年月日
+          licenseNumber: '',     // 飲食店営業許可の番号
+        },
       },
       /* 下絵(間取り図などの画像をなぞる用)。未設定なら null。
        *   src=画像(dataURL), x,y=左上(mm), w,h=実寸(mm), opacity=不透明度(0〜1) */
@@ -131,6 +153,9 @@
       /* メモ・引き出し線。x,y=文字の箱の左上(mm)、tx,ty=矢印の先端(mm)。
        * layer=表示する図面(作成時の図面にだけ出る)。図面・PDFにそのまま印字される。 */
       notes: [],
+      /* 手動の寸法線。任意の2点(x1,y1)-(x2,y2)間に寸法線と長さ(m)を描く。
+       * layer=表示する図面。図面・PDFにそのまま印字される。 */
+      dimensions: [],
       /* 必要書類チェックリストの状態。corp=法人かどうか, items={id: true} */
       checklist: { corp: false, items: {} },
       _seq: 1,
@@ -300,12 +325,24 @@
     return note;
   }
 
+  /* 手動の寸法線を追加する。2点は呼び出し側(作図確定時)が渡す。 */
+  function addDimension(project, x1, y1, x2, y2, layer) {
+    const dim = {
+      id: nextId(project, 'd'),
+      x1, y1, x2, y2,
+      layer: layer || 'plan',
+    };
+    project.dimensions = project.dimensions || [];
+    project.dimensions.push(dim);
+    return dim;
+  }
+
   function removeById(project, id) {
     if (project.premise && project.premise.id === id) {
       project.premise = null;
       return true;
     }
-    for (const key of ['regions', 'furniture', 'fittings', 'fixtures', 'notes']) {
+    for (const key of ['regions', 'furniture', 'fittings', 'fixtures', 'notes', 'dimensions']) {
       const i = (project[key] || []).findIndex((e) => e.id === id);
       if (i >= 0) { project[key].splice(i, 1); return true; }
     }
@@ -316,7 +353,7 @@
     if (project.premise && project.premise.id === id) {
       return { element: project.premise, kind: 'premise' };
     }
-    for (const key of ['regions', 'furniture', 'fittings', 'fixtures', 'notes']) {
+    for (const key of ['regions', 'furniture', 'fittings', 'fixtures', 'notes', 'dimensions']) {
       const e = (project[key] || []).find((e) => e.id === id);
       if (e) return { element: e, kind: key };
     }
@@ -328,10 +365,15 @@
   function duplicateElement(project, id) {
     const found = findById(project, id);
     if (!found || found.kind === 'premise') return null;
-    const prefix = { regions: 'r', furniture: 'f', fittings: 'g', fixtures: 'x', notes: 'n' }[found.kind];
+    const prefix = { regions: 'r', furniture: 'f', fittings: 'g', fixtures: 'x', notes: 'n', dimensions: 'd' }[found.kind];
     const copy = JSON.parse(JSON.stringify(found.element));
     copy.id = nextId(project, prefix);
     const d = 300; // 元の要素と完全に重ならないようにずらす量(mm)
+    if (found.kind === 'dimensions') {
+      copy.x1 += d; copy.y1 += d; copy.x2 += d; copy.y2 += d;
+      project[found.kind].push(copy);
+      return copy;
+    }
     copy.x += d;
     copy.y += d;
     if (found.kind === 'notes') { copy.tx += d; copy.ty += d; }
@@ -368,6 +410,9 @@
     project.premise = obj.premise || null;
     project.underlay = obj.underlay || null;
     project.notes = obj.notes || [];
+    project.dimensions = obj.dimensions || [];
+    // 届出書情報は項目を追加しても古いデータが壊れないよう既定値で補完する
+    project.meta.todokede = Object.assign({}, base.meta.todokede, (obj.meta && obj.meta.todokede) || {});
     project.checklist = Object.assign({ corp: false, items: {} }, obj.checklist || {});
     project.checklist.items = (obj.checklist && obj.checklist.items) || {};
     if (typeof project._seq !== 'number') {
@@ -382,7 +427,7 @@
     SIGHTLINE_LIMIT, CHECKLIST_ITEMS,
     todayStr, defaultProject, nextId, nextRegionNumber,
     addRegion, addPolygonRegion, normalizePolygon, setPremise,
-    addFurniture, addFitting, addFixture, addNote,
+    addFurniture, addFitting, addFixture, addNote, addDimension,
     removeById, findById, duplicateElement,
     serialize, deserialize,
   };

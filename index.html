@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.6.1">
+  <link rel="stylesheet" href="css/style.css?v=1.7.0">
 </head>
 <body>
   <header class="topbar">
@@ -18,6 +18,7 @@
       <button id="btnUndo" class="btn" title="元に戻す (Cmd/Ctrl+Z)">↩ 戻す</button>
       <button id="btnRedo" class="btn" title="やり直す (Shift+Cmd/Ctrl+Z)">↪ やり直す</button>
       <button id="btnChecklist" class="btn">必要書類</button>
+      <button id="btnTodokede" class="btn">届出者情報</button>
       <button id="btnForms" class="btn">届出書作成</button>
       <button id="btnSave"  class="btn">保存</button>
       <button id="btnLoad"  class="btn">読み込み</button>
@@ -138,6 +139,12 @@
         <p class="muted">記号と台数の凡例は図面右下に自動表示されます。</p>
       </section>
 
+      <section class="group" data-layers="plan premises kyakushitsu">
+        <h3>寸法を記入</h3>
+        <button id="btnAddDim" class="btn block">寸法を記入</button>
+        <p class="muted">壁から客室までの距離や出入口の幅など、好きな2点間の長さ(m)を図面に書き込めます。ボタンを押して1点目→2点目をクリック。両端の□はドラッグで動かせます。</p>
+      </section>
+
       <section class="group">
         <h3>メモ・引き出し線</h3>
         <button id="btnAddNote" class="btn block">メモを追加</button>
@@ -181,6 +188,8 @@
         </label>
         <label class="check-row"><input type="checkbox" id="metaFrame"> 用紙枠ガイドを表示</label>
         <label class="check-row"><input type="checkbox" id="metaNorth"> 方位記号(N)を表示</label>
+        <label class="check-row"><input type="checkbox" id="printTrueScale"> PDFを実寸の縮尺で印刷(定規で正確に1/縮尺)</label>
+        <p class="muted">チェックすると、PDFが用紙に「収める」のではなく、実際に1/縮尺どおりの大きさで出力されます。印刷時はダイアログの倍率を「100%(実際のサイズ)」にしてください。図面が用紙からはみ出す場合は用紙をA3にするか縮尺を1/100にします。</p>
         <p class="muted">用紙サイズ×縮尺の範囲を青い破線で表示します。この枠内に収めると1枚に収まります。方位記号(N)は表示中に先端をドラッグで回転できます。</p>
       </section>
 
@@ -244,12 +253,24 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.6.1"></script>
-  <script src="js/geometry.js?v=1.6.1"></script>
-  <script src="js/render.js?v=1.6.1"></script>
-  <script src="js/interactions.js?v=1.6.1"></script>
-  <script src="js/print.js?v=1.6.1"></script>
-  <script src="js/forms.js?v=1.6.1"></script>
-  <script src="js/main.js?v=1.6.1"></script>
+  <!-- 届出者・営業所情報(モーダル) -->
+  <div id="todokedeModal" class="modal-back" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>届出者・営業所情報(届出書に自動転記)</h2>
+        <button id="btnTodokedeClose" class="btn small">閉じる</button>
+      </div>
+      <p class="muted">ここに入力した内容は「届出書作成」の様式第47号・第48号へ自動で転記されます。図面から自動計算される面積・客室数・設備は入力不要です。案件ごとに自動保存されます。</p>
+      <div id="todokedeBody"></div>
+    </div>
+  </div>
+
+  <script src="js/model.js?v=1.7.0"></script>
+  <script src="js/geometry.js?v=1.7.0"></script>
+  <script src="js/render.js?v=1.7.0"></script>
+  <script src="js/interactions.js?v=1.7.0"></script>
+  <script src="js/print.js?v=1.7.0"></script>
+  <script src="js/forms.js?v=1.7.0"></script>
+  <script src="js/main.js?v=1.7.0"></script>
 </body>
 </html>

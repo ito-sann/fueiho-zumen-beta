@@ -322,6 +322,28 @@
     $('btnRestore').onclick = () => $('backupInput').click();
     $('backupInput').onchange = importBackupFile;
 
+    // 寸法線(任意の2点間に長さを記入)
+    $('btnAddDim').onclick = () => {
+      if (state.measure) { I.cancelMeasure(state); draw(); return; }
+      // 図面系のレイヤーで使う(設備図・姿図では扱わない)
+      if (R.getLayer() === 'lighting' || R.getLayer() === 'furnviews') {
+        R.setLayer('plan'); buildLayerTabs();
+      }
+      I.beginMeasure(state, (x1, y1, x2, y2) => {
+        const dim = M.addDimension(project, x1, y1, x2, y2, R.getLayer());
+        state.selectedId = dim.id;
+        refresh(); showProps(dim);
+      });
+      draw();
+    };
+
+    // 届出者・営業所情報(届出書に自動転記する内容)
+    $('btnTodokede').onclick = openTodokede;
+    $('btnTodokedeClose').onclick = () => { $('todokedeModal').hidden = true; };
+    $('todokedeModal').onclick = (e) => {
+      if (e.target.id === 'todokedeModal') $('todokedeModal').hidden = true;
+    };
+
     // メモ・引き出し線(いま開いている図面に追加)
     $('btnAddNote').onclick = () => {
       const n = M.addNote(project, R.getLayer());
@@ -511,6 +533,46 @@
     };
   }
 
+  /* ---- 届出者・営業所情報(届出書に自動転記) ---- */
+  // [保存キー, ラベル, 種類('text'|'area'), プレースホルダ]
+  const TODOKEDE_FIELDS = [
+    ['applicantAddress', '届出者の住所', 'text', '例: 岐阜県岐阜市○○町1-2-3'],
+    ['applicantName', '届出者の氏名(法人は名称)', 'text', '例: 山田太郎 / 株式会社○○'],
+    ['corpRepName', '法人の代表者氏名(法人のみ)', 'text', '例: 代表取締役 山田太郎'],
+    ['phone', '電話番号', 'text', '例: 058-000-0000'],
+    ['applicantKana', '営業所名称のふりがな', 'text', '例: すなっくなごみ'],
+    ['addressee', '宛先(都道府県名)', 'text', '空欄なら所在地から自動。例: 岐阜県'],
+    ['buildingStructure', '建物の構造', 'text', '例: 鉄筋コンクリート造3階建2階部分'],
+    ['buildingPosition', '建物内の営業所の位置', 'text', '例: 2階南側'],
+    ['businessHours', '営業時間', 'text', '例: 午後6時から翌日午前2時まで'],
+    ['staffCount', '従事する者の数', 'text', '例: 3'],
+    ['alcoholMethod', '酒類の提供方法', 'text', '例: 客の注文により座席で提供する'],
+    ['minorRule', '18歳未満の立入りに関する事項', 'area', ''],
+    ['licenseDate', '飲食店営業許可の年月日', 'text', '例: 令和6年4月1日'],
+    ['licenseNumber', '飲食店営業許可の番号', 'text', '例: 第○○○号'],
+  ];
+  function openTodokede() {
+    const t = project.meta.todokede;
+    let html = '<div class="todokede-form">';
+    for (const [key, label, type, ph] of TODOKEDE_FIELDS) {
+      const v = esc(t[key] || '');
+      const input = type === 'area'
+        ? `<textarea data-todokede="${key}" rows="2" placeholder="${esc(ph)}">${v}</textarea>`
+        : `<input type="text" data-todokede="${key}" value="${v}" placeholder="${esc(ph)}">`;
+      html += `<label class="field">${esc(label)}${input}</label>`;
+    }
+    html += '</div>';
+    const box = $('todokedeBody');
+    box.innerHTML = html;
+    box.querySelectorAll('[data-todokede]').forEach((inp) => {
+      inp.oninput = (e) => {
+        project.meta.todokede[e.target.dataset.todokede] = e.target.value;
+        scheduleAutosave(); scheduleHistory();
+      };
+    });
+    $('todokedeModal').hidden = false;
+  }
+
   /* ---- 必要書類チェックリスト ---- */
   function openChecklist() {
     $('checkCorp').checked = !!project.checklist.corp;
@@ -628,6 +690,7 @@
     $('premWall').value = project.premise ? project.premise.wallThickness : 100;
     $('premMeasured').value = project.premise ? project.premise.measuredAt : 'inner';
     $('deductPillars').checked = m.deductPillars === true;
+    $('printTrueScale').checked = m.printTrueScale === true;
     syncUnderlayUi();
     // 文字情報も自動保存と履歴の対象にする(店舗名は案件名にもなる)
     $('metaStore').oninput = (e) => { m.storeName = e.target.value; scheduleAutosave(); scheduleHistory(); };
@@ -645,6 +708,8 @@
     $('premMethod').onchange = (e) => { m.premisesMethod = e.target.value; refresh(); };
     // 柱の面積を区画(客室・調理場など)の面積から差し引くか
     $('deductPillars').onchange = (e) => { m.deductPillars = e.target.checked; refresh(); };
+    // PDFを実寸の縮尺で印刷するか
+    $('printTrueScale').onchange = (e) => { m.printTrueScale = e.target.checked; scheduleAutosave(); };
     // 設備図コメントは凡例に即時反映させるため、入力のたびに再描画する
     $('fixNote').oninput = (e) => { m.lightingNote = e.target.value; draw(); };
   }
@@ -653,8 +718,23 @@
   function draw() {
     R.render(ctx, canvasCss(), project, state);
     setDraftUi(state.draft); // 作図の進み具合に応じてボタン・ヒントを更新
+    updateMeasureUi();       // 寸法線の作図中ボタン表示を更新
     scheduleAutosave();      // 変更が一段落したらブラウザ内に自動保存
     scheduleHistory();       // 「元に戻す」用の履歴も同じタイミングで積む
+  }
+
+  /* 寸法線の作図中はボタン表示とヒントを切り替える */
+  function updateMeasureUi() {
+    const b = $('btnAddDim');
+    if (!b) return;
+    if (state.measure) {
+      b.textContent = '寸法の記入を中止(Esc)';
+      b.classList.add('danger');
+      $('hint').textContent = '寸法線: 1点目をクリック → 2点目をクリックで確定 / Escで中止';
+    } else {
+      b.textContent = '寸法を記入';
+      b.classList.remove('danger');
+    }
   }
   function refresh() {
     draw();
@@ -882,13 +962,13 @@
       // メモは本文(複数行可)を直接編集する
       html += `<label class="prop-row"><span>本文</span>
         <textarea data-field="text" rows="3">${esc(el.text || '')}</textarea></label>`;
-    } else {
+    } else if (kind !== 'dimensions') {
       html += propText('ラベル', 'label', el.label);
     }
     // ラベルを持つ要素は文字サイズを個別に調整できる。
     // Googleドキュメント風のサイズ番号(15=標準)で、−/＋は段階リストを移動する。
-    if (kind === 'regions' || kind === 'furniture' || kind === 'fittings' || kind === 'notes') {
-      const dMm = kind === 'regions' ? 320 : (kind === 'notes' ? 240 : 200); // render.js の既定値と揃える
+    if (kind === 'regions' || kind === 'furniture' || kind === 'fittings' || kind === 'notes' || kind === 'dimensions') {
+      const dMm = kind === 'regions' ? 320 : (kind === 'furniture' || kind === 'fittings' ? 200 : 240); // render.js の既定値と揃える
       const curSize = el.fontSize > 0 ? el.fontSize
         : (el.fontMm > 0 ? Math.round(el.fontMm / dMm * 15) : 15);
       html += `<div class="prop-row"><span>文字サイズ</span>
@@ -900,8 +980,20 @@
           <button type="button" id="fontAuto" class="btn small">標準</button>
         </span></div>`;
     }
-    html += propNum('X位置(mm)', 'x', el.x);
-    html += propNum('Y位置(mm)', 'y', el.y);
+    if (kind === 'dimensions') {
+      // 寸法線: 長さ(自動)と表示する図面、両端の座標(直接入力も可)
+      const lenM = G.mmToM(Math.hypot(el.x2 - el.x1, el.y2 - el.y1));
+      const lopts = Object.entries(R.LAYERS).map(([k, v]) =>
+        `<option value="${k}"${(el.layer || 'plan') === k ? ' selected' : ''}>${v.label}</option>`).join('');
+      html += `<div class="prop-row"><span>長さ</span><b id="propDimLen">${lenM.toFixed(2)} m</b></div>`;
+      html += `<div class="prop-row"><span>表示する図面</span><select id="propNoteLayer">${lopts}</select></div>`;
+      html += propNum('始点X(mm)', 'x1', el.x1) + propNum('始点Y(mm)', 'y1', el.y1);
+      html += propNum('終点X(mm)', 'x2', el.x2) + propNum('終点Y(mm)', 'y2', el.y2);
+      html += '<p class="muted">両端の□はキャンバス上でドラッグでも動かせます。</p>';
+    } else {
+      html += propNum('X位置(mm)', 'x', el.x);
+      html += propNum('Y位置(mm)', 'y', el.y);
+    }
     if (kind === 'notes') {
       // どの図面に表示するかをあとから変えられる(矢印の先端はドラッグで移動)
       const lopts = Object.entries(R.LAYERS).map(([k, v]) =>
@@ -991,6 +1083,11 @@
         if (numEl) {
           const n = G.furnitureNumberMap(project)[el.id];
           numEl.textContent = n ? G.code(n) : '—';
+        }
+        // 寸法線の長さ表示も即時に更新(始点・終点の変更に追従)
+        const lenEl = box.querySelector('#propDimLen');
+        if (lenEl) {
+          lenEl.textContent = G.mmToM(Math.hypot(el.x2 - el.x1, el.y2 - el.y1)).toFixed(2) + ' m';
         }
       });
     });
@@ -1084,6 +1181,7 @@
     if (kind === 'furniture') return '備品';
     if (kind === 'fittings') return '建具・設備';
     if (kind === 'notes') return 'メモ・引き出し線';
+    if (kind === 'dimensions') return '寸法線';
     return '照明・音響';
   }
   function propText(label, field, val) {

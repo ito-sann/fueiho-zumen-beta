@@ -931,6 +931,94 @@
     }
   }
 
+  /* ---- 手動の寸法線(任意の2点間) ---- */
+
+  /* 寸法線を1本描く: 両端に矢羽根(目盛)、中央の少し外側に長さ(m)。
+   * 選択中は赤くし、両端にドラッグ用ハンドルを出す。 */
+  function drawManualDim(ctx, d, opts) {
+    const a = worldToScreen(d.x1, d.y1);
+    const b = worldToScreen(d.x2, d.y2);
+    const lenM = global.Geometry.mmToM(Math.hypot(d.x2 - d.x1, d.y2 - d.y1));
+    const line = opts.selected ? '#d32f2f' : '#1565c0';
+    ctx.save();
+    ctx.strokeStyle = line;
+    ctx.fillStyle = line;
+    ctx.lineWidth = opts.selected ? 2.5 : 1.5;
+    // 本体の線
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    // 両端の目盛(線に直交する短い線)
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    const t = Math.max(6, wpx(120));
+    const nx = Math.cos(ang + Math.PI / 2), ny = Math.sin(ang + Math.PI / 2);
+    for (const p of [a, b]) {
+      ctx.beginPath();
+      ctx.moveTo(p.x - nx * t, p.y - ny * t);
+      ctx.lineTo(p.x + nx * t, p.y + ny * t);
+      ctx.stroke();
+    }
+    // 長さ(m)を中点の少し外側(線の上側)に
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const off = Math.max(8, wpx(220));
+    ctx.font = `${fontPx(240, d)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    // 文字が線で隠れないよう白フチを敷く
+    const label = lenM.toFixed(2) + 'm';
+    ctx.save();
+    ctx.translate(mx - nx * off, my - ny * off);
+    let rot = ang;
+    if (rot > Math.PI / 2 || rot < -Math.PI / 2) rot += Math.PI; // 文字が逆さまにならないように
+    ctx.rotate(rot);
+    ctx.lineWidth = 3; ctx.strokeStyle = '#fff';
+    ctx.strokeText(label, 0, 0);
+    ctx.fillStyle = line;
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+    // 選択中: 両端ハンドル
+    if (opts.selected) {
+      for (const p of [a, b]) {
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#d32f2f';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(p.x - 4, p.y - 4, 8, 8);
+        ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawManualDims(ctx, project, state) {
+    for (const d of (project.dimensions || [])) {
+      if ((d.layer || 'plan') !== currentLayer) continue;
+      drawManualDim(ctx, d, { selected: state.selectedId === d.id });
+    }
+  }
+
+  /* 寸法線の作図プレビュー(1点目を置いた後、カーソルまでの仮の線) */
+  function drawMeasureDraft(ctx, measure) {
+    if (!measure || !measure.p1) return;
+    const a = worldToScreen(measure.p1.x, measure.p1.y);
+    ctx.save();
+    ctx.fillStyle = '#d32f2f';
+    ctx.beginPath(); ctx.arc(a.x, a.y, 4, 0, Math.PI * 2); ctx.fill();
+    if (measure.cursor) {
+      const b = worldToScreen(measure.cursor.x, measure.cursor.y);
+      ctx.strokeStyle = '#d32f2f';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.setLineDash([]);
+      const lenM = global.Geometry.mmToM(Math.hypot(measure.cursor.x - measure.p1.x, measure.cursor.y - measure.p1.y));
+      ctx.fillStyle = '#d32f2f';
+      ctx.font = `${fontPx(240)}px sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(lenM.toFixed(2) + 'm', b.x + wpx(150), b.y);
+    }
+    ctx.restore();
+  }
+
   /* どのレイヤーで何を表示するか */
   function visibility(layer) {
     switch (layer) {
@@ -980,6 +1068,7 @@
     // 備品姿図は間取りを描かず、姿図シートとメモだけを描いて終わる
     if (currentLayer === 'furnviews') {
       drawFurnViews(ctx, canvas, project);
+      drawManualDims(ctx, project, state);
       drawNotes(ctx, project, state);
       return;
     }
@@ -1038,8 +1127,11 @@
     if (currentLayer === 'premises' && project.premise) {
       drawPremiseCenterline(ctx, project);
     }
-    // メモ・引き出し線(この図面に属するもの)は要素の上に描く
+    // 手動の寸法線・メモ(この図面に属するもの)は要素の上に描く
+    drawManualDims(ctx, project, state);
     drawNotes(ctx, project, state);
+    // 寸法線の作図中プレビュー
+    if (state.measure) drawMeasureDraft(ctx, state.measure);
     // 多角形の作図中なら下書きを最前面に描く
     if (state.draft && state.draft.points) {
       drawDraft(ctx, state.draft);

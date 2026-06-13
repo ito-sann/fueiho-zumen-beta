@@ -34,6 +34,15 @@
   function cancelPolygon(state) {
     state.draft = null;
   }
+
+  /* 寸法線の作図を開始する。1点目をクリック→2点目をクリックで確定。
+   * 確定すると onDone(x1,y1,x2,y2) が呼ばれる。Esc で中止。 */
+  function beginMeasure(state, onDone) {
+    state.measure = { p1: null, cursor: null, onDone };
+  }
+  function cancelMeasure(state) {
+    state.measure = null;
+  }
   function finishDraft(state) {
     const d = state.draft;
     state.draft = null;
@@ -93,10 +102,25 @@
     return null;
   }
 
+  /* 手動寸法線の当たり判定(線の近くをつかめる) */
+  function dimAt(project, wx, wy) {
+    const dims = project.dimensions || [];
+    const tol = Math.max(120, 8 / global.Render.view.zoom);
+    for (let i = dims.length - 1; i >= 0; i--) {
+      const d = dims[i];
+      if ((d.layer || 'plan') !== global.Render.getLayer()) continue;
+      if (distToSegment(wx, wy, d.x1, d.y1, d.x2, d.y2) <= tol) return d;
+    }
+    return null;
+  }
+
   function hitTest(project, wx, wy) {
     // 最前面のメモを最優先
     const note = noteAt(project, wx, wy);
     if (note) return note;
+    // 手動寸法線(線の近く)
+    const dim = dimAt(project, wx, wy);
+    if (dim) return dim;
     // 上に描かれるもの(設備→備品→区画)を優先
     for (let i = project.fixtures.length - 1; i >= 0; i--) {
       const x = project.fixtures[i];
@@ -126,11 +150,13 @@
     // 外さないとイベントが二重に処理され、頂点の重複追加や矢印キーの2倍移動が起きる。
     if (canvas._detachInteractions) canvas._detachInteractions();
 
-    let mode = null; // 'drag' | 'pan' | 'vertex' | 'north'
+    let mode = null; // 'drag' | 'pan' | 'vertex' | 'north' | 'notetip' | 'underlay' | 'dimpt'
     let last = null; // 直前のマウス位置(画面px)
     let dragTarget = null;
     let grabOffset = { x: 0, y: 0 }; // 要素原点とカーソルの差(mm)
     let vertexIndex = -1; // 頂点ドラッグ中の頂点番号
+    let dimSpan = { dx: 0, dy: 0 };  // 寸法線を動かすときの2点間ベクトル
+    let dimEnd = 1;                  // 寸法線の端点ドラッグ中の端(1 or 2)
 
     function pos(e) {
       const rect = canvas.getBoundingClientRect();
@@ -156,9 +182,37 @@
       return null;
     }
 
+    /* 選択中の寸法線の端点(画面8px以内)を探す */
+    function findDimEndAt(p) {
+      if (!state.selectedId) return null;
+      const found = global.Model.findById(project, state.selectedId);
+      if (!found || found.kind !== 'dimensions') return null;
+      const d = found.element;
+      const ends = [[1, d.x1, d.y1], [2, d.x2, d.y2]];
+      for (const [no, wx, wy] of ends) {
+        const s = global.Render.worldToScreen(wx, wy);
+        if (Math.hypot(p.x - s.x, p.y - s.y) <= 8) return { dim: d, end: no };
+      }
+      return null;
+    }
+
     const onMouseDown = (e) => {
       const p = pos(e);
       const w = global.Render.screenToWorld(p.x, p.y);
+
+      // 寸法線の作図中: 1点目→2点目をクリックで確定(Escで中止)
+      if (state.measure) {
+        const sp = { x: snap(w.x), y: snap(w.y) };
+        if (!state.measure.p1) {
+          state.measure.p1 = sp;
+        } else {
+          const m = state.measure;
+          state.measure = null;
+          m.onDone(m.p1.x, m.p1.y, sp.x, sp.y);
+        }
+        onChange();
+        return;
+      }
 
       // 選択中のメモの矢印の先端をつかんだら、先端の移動モード(どの図面でも)
       if (state.selectedId && !state.draft) {
@@ -172,6 +226,16 @@
             return;
           }
         }
+      }
+
+      // 選択中の寸法線の端点をつかんだら端点ドラッグ
+      const de = findDimEndAt(p);
+      if (de) {
+        mode = 'dimpt';
+        dragTarget = de.dim;
+        dimEnd = de.end;
+        last = p;
+        return;
       }
 
       // 備品姿図は一覧表示専用: メモ以外はパンとズームだけにする
@@ -240,7 +304,13 @@
       if (hit) {
         mode = 'drag';
         dragTarget = hit;
-        grabOffset = { x: w.x - hit.x, y: w.y - hit.y };
+        if (hit.x1 !== undefined) {
+          // 寸法線は2点まとめて動かす(つかんだ位置を基準にする)
+          grabOffset = { x: w.x - hit.x1, y: w.y - hit.y1 };
+          dimSpan = { dx: hit.x2 - hit.x1, dy: hit.y2 - hit.y1 };
+        } else {
+          grabOffset = { x: w.x - hit.x, y: w.y - hit.y };
+        }
         state.selectedId = hit.id;
         onSelect(hit);
         onChange();
@@ -262,6 +332,15 @@
         onChange();
         return;
       }
+      // 寸法線の作図中(1点目を置いた後)はプレビュー線を更新する
+      if (state.measure) {
+        if (state.measure.p1) {
+          const w = global.Render.screenToWorld(p0.x, p0.y);
+          state.measure.cursor = { x: snap(w.x), y: snap(w.y) };
+          onChange();
+        }
+        return;
+      }
       if (!mode) return;
       const p = p0;
       if (mode === 'north') {
@@ -277,6 +356,15 @@
         if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); }
         dragTarget.points[vertexIndex] = { x: nx - dragTarget.x, y: ny - dragTarget.y };
         global.Model.normalizePolygon(dragTarget);
+        onChange();
+        onSelect(dragTarget);
+      } else if (mode === 'dimpt' && dragTarget) {
+        // 寸法線の片方の端点を動かす
+        const w = global.Render.screenToWorld(p.x, p.y);
+        let nx = w.x, ny = w.y;
+        if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); }
+        if (dimEnd === 1) { dragTarget.x1 = nx; dragTarget.y1 = ny; }
+        else { dragTarget.x2 = nx; dragTarget.y2 = ny; }
         onChange();
         onSelect(dragTarget);
       } else if (mode === 'notetip' && dragTarget) {
@@ -305,8 +393,14 @@
         let nx = w.x - grabOffset.x;
         let ny = w.y - grabOffset.y;
         if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); }
-        dragTarget.x = nx;
-        dragTarget.y = ny;
+        if (dragTarget.x1 !== undefined) {
+          // 寸法線は2点まとめて平行移動する
+          dragTarget.x1 = nx; dragTarget.y1 = ny;
+          dragTarget.x2 = nx + dimSpan.dx; dragTarget.y2 = ny + dimSpan.dy;
+        } else {
+          dragTarget.x = nx;
+          dragTarget.y = ny;
+        }
         onChange();
         onSelect(dragTarget); // プロパティ欄の座標も更新
       }
@@ -355,6 +449,11 @@
         }
         return;
       }
+      // 寸法線の作図中: Esc で中止
+      if (state.measure) {
+        if (e.key === 'Escape') { cancelMeasure(state); onChange(); }
+        return;
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedId) {
         global.Model.removeById(project, state.selectedId);
         state.selectedId = null;
@@ -397,5 +496,6 @@
   global.Interactions = {
     attach, snap, setSnap, getSnap, hitTest,
     beginPolygon, cancelPolygon, finishPolygon: finishDraft,
+    beginMeasure, cancelMeasure,
   };
 })(window);

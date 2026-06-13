@@ -440,6 +440,9 @@
     for (const n of (project.notes || [])) {
       consider(n.x, n.y); consider(n.tx, n.ty);
     }
+    for (const d of (project.dimensions || [])) {
+      consider(d.x1, d.y1); consider(d.x2, d.y2);
+    }
     if (!isFinite(minX)) {
       return { x: 0, y: 0, w: 8000, h: 6000 };
     }
