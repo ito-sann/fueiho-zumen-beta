@@ -838,31 +838,34 @@
     ctx.fillText(
       `用紙枠 ${m.paper}${orient}(この枠内 = ${(f.w / 1000).toFixed(2)} × ${(f.h / 1000).toFixed(2)} m)`,
       tl.x, tl.y - wpx(90));
-    // 右下: スケールバー(黒線の長さ = 図面上の1m)と縮尺表示。各部も実寸基準
-    const barLen = wpx(1000); // 1m分の画面上の長さ
-    const bx2 = br.x - wpx(280), bx1 = bx2 - barLen;
-    const by = br.y - wpx(620); // 下のラベルが枠線にかからない高さ
-    ctx.strokeStyle = '#111';
-    ctx.fillStyle = '#111';
-    ctx.lineWidth = 2;
-    // 本体の線
-    ctx.beginPath(); ctx.moveTo(bx1, by); ctx.lineTo(bx2, by); ctx.stroke();
-    // 両端の目盛(縦線)と中央(0.5m)の小さい目盛
-    const tk = wpx(130), tkS = wpx(65);
-    ctx.beginPath();
-    ctx.moveTo(bx1, by - tk); ctx.lineTo(bx1, by + tk);
-    ctx.moveTo(bx2, by - tk); ctx.lineTo(bx2, by + tk);
-    ctx.moveTo((bx1 + bx2) / 2, by - tkS); ctx.lineTo((bx1 + bx2) / 2, by + tkS);
-    ctx.stroke();
-    // ラベル: 線の両端に 0 / 1m、上に縮尺
-    ctx.font = `bold ${wpx(240)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText('0', bx1, by + wpx(180));
-    ctx.fillText('1m', bx2, by + wpx(180));
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(`縮尺 1/${m.scale}`, bx2, by - wpx(180));
+    // 右下: スケールバー(黒線の長さ = 図面上の1m)と縮尺表示。各部も実寸基準。
+    // 備品姿図は用紙に収めて出すため縮尺が一定でない。誤解を招くので非表示にする。
+    if (currentLayer !== 'furnviews') {
+      const barLen = wpx(1000); // 1m分の画面上の長さ
+      const bx2 = br.x - wpx(280), bx1 = bx2 - barLen;
+      const by = br.y - wpx(620); // 下のラベルが枠線にかからない高さ
+      ctx.strokeStyle = '#111';
+      ctx.fillStyle = '#111';
+      ctx.lineWidth = 2;
+      // 本体の線
+      ctx.beginPath(); ctx.moveTo(bx1, by); ctx.lineTo(bx2, by); ctx.stroke();
+      // 両端の目盛(縦線)と中央(0.5m)の小さい目盛
+      const tk = wpx(130), tkS = wpx(65);
+      ctx.beginPath();
+      ctx.moveTo(bx1, by - tk); ctx.lineTo(bx1, by + tk);
+      ctx.moveTo(bx2, by - tk); ctx.lineTo(bx2, by + tk);
+      ctx.moveTo((bx1 + bx2) / 2, by - tkS); ctx.lineTo((bx1 + bx2) / 2, by + tkS);
+      ctx.stroke();
+      // ラベル: 線の両端に 0 / 1m、上に縮尺
+      ctx.font = `bold ${wpx(240)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('0', bx1, by + wpx(180));
+      ctx.fillText('1m', bx2, by + wpx(180));
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`縮尺 1/${m.scale}`, bx2, by - wpx(180));
+    }
     ctx.restore();
   }
 
@@ -1014,9 +1017,9 @@
     // 余白・間隔(ワールドmm) — 旧版より大幅に詰めた
     const PAD = 350;       // カード内側の余白
     const LABEL_H = 650;   // 品名ラベルの高さ
-    const CAP_H = 800;     // 図の下の寸法キャプションの高さ
+    const CAP_H = 1500;    // 図の下: 正面/側面ラベル + 寸法(幅・奥行・高さ)の領域
     const INNER_GAP = 600; // 正面図と側面図のすき間
-    const HDIM_W = 1500;   // 高さ寸法(縦書き)の右余白
+    const CAP_MIN_W = 3000; // 寸法行(幅 ◯m × 奥行 ◯m)が収まる最小カード幅
     const COL_GAP = 900, ROW_GAP = 900; // カード同士のすき間
     const MARGIN = 900;    // 用紙枠の内側に取る余白
     const TITLE_H = 1500;  // 上部タイトルのための余白
@@ -1031,7 +1034,7 @@
     const originX = (frame ? frame.x : 0) + MARGIN;
     const originY = (frame ? frame.y : 0) + TITLE_H;
     // 1行に詰め込める右端。1品が単独で超える場合はその品の幅を許容
-    const cardW = (g) => PAD * 2 + (g.w + INNER_GAP + g.h) + HDIM_W;
+    const cardW = (g) => PAD * 2 + Math.max(g.w + INNER_GAP + g.h, CAP_MIN_W);
     const figH = (g) => Math.max(g.height || 0, 400);          // 図の高さ
     const cardH1 = (g) => PAD * 2 + LABEL_H + figH(g) + CAP_H;  // カード単体の高さ
     const maxCardW = groups.reduce((m, g) => Math.max(m, cardW(g)), 0);
@@ -1191,8 +1194,8 @@
       // --- 正面図(幅 × 高さ) と 側面図(奥行 × 高さ) ---
       // なぞって描いた形(prof)があればそのシルエットを、なければ外形の四角を描く
       const views = [
-        { x0: left, w: g.w, cap: `正面 幅${G.fmtM(g.w)}m`, prof: g.front },
-        { x0: left + g.w + innerGap, w: g.h, cap: `側面 奥行${G.fmtM(g.h)}m`, prof: g.side },
+        { x0: left, w: g.w, name: '正面', prof: g.front },
+        { x0: left + g.w + innerGap, w: g.h, name: '側面', prof: g.side },
       ];
       for (const v of views) {
         ctx.fillStyle = fill;
@@ -1207,24 +1210,25 @@
           ctx.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
           ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
         }
+        // 図の真下には「正面 / 側面」だけ(短いので隣と重ならない)
         const capX = worldToScreen(v.x0 + v.w / 2, c.floorY);
         ctx.fillStyle = '#1565c0';
-        ctx.font = `${fontPx(200)}px sans-serif`;
+        ctx.font = `${fontPx(190)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText(v.cap, capX.x, capX.y + wpx(130));
+        ctx.fillText(v.name, capX.x, capX.y + wpx(150));
       }
-      // --- 高さ寸法(側面図の右側に縦書き) ---
-      const hx = worldToScreen(left + g.w + innerGap + g.h + 350, c.floorY - g.height / 2);
-      ctx.save();
-      ctx.translate(hx.x, hx.y);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillStyle = over ? '#c62828' : '#1565c0';
-      ctx.font = `${fontPx(200)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`高さ${G.fmtM(g.height)}m`, 0, 0);
-      ctx.restore();
+      // --- 寸法(幅・奥行・高さ)はカード左下にまとめて左そろえで書く ---
+      // 図の真下に重ねると正面・側面のキャプションどうしが重なるため、行で分ける。
+      const dim1 = worldToScreen(left, c.floorY + 620);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.font = `${fontPx(185)}px sans-serif`;
+      ctx.fillStyle = '#37474f';
+      ctx.fillText(`幅 ${G.fmtM(g.w)}m  ×  奥行 ${G.fmtM(g.h)}m`, dim1.x, dim1.y);
+      const dim2 = worldToScreen(left, c.floorY + 620 + 470);
+      ctx.fillStyle = over ? '#c62828' : '#37474f';
+      ctx.fillText(`高さ ${G.fmtM(g.height)}m${over ? '(⚠1m超)' : ''}`, dim2.x, dim2.y);
     }
     ctx.restore();
   }
