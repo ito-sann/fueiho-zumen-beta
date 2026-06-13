@@ -634,6 +634,175 @@
     ctx.restore();
   }
 
+  /* 図面そのものに重ねる求積表のデータを組み立てる。
+   * premises=営業所求積表 / kyakushitsu=客室・調理場求積表。
+   * 行は { code, label, expr(計算式), area } を持つ。 */
+  function kyusekiSheetTables(project, layer) {
+    const G = global.Geometry;
+    const tables = [];
+    const regionTable = (title, t) => ({
+      title,
+      cols: ['符号', '区画', '計算式', '面積(㎡)'],
+      align: ['center', 'left', 'left', 'right'],
+      rows: t.rows.map((r) => [
+        r.code, r.label, r.expr,
+        r.area < 0 ? '△' + Math.abs(r.area).toFixed(2) : r.area.toFixed(2),
+      ]),
+      foot: ['合計', '', '', t.total.toFixed(2) + ' ㎡'],
+    });
+    if (layer === 'kyakushitsu') {
+      tables.push(regionTable('客室求積表', G.buildTable(project, ['kyakushitsu'])));
+      tables.push(regionTable('調理場求積表', G.buildTable(project, ['chubo'])));
+    } else if (layer === 'premises') {
+      const method = project.meta.premisesMethod || 'regions';
+      if (method !== 'centerline') {
+        tables.push(regionTable(
+          method === 'both' ? '営業所求積表(内法・区画合計)' : '営業所求積表',
+          G.buildTable(project, null)));
+      }
+      // 壁芯(座標法)の方式では座標求積表を載せる
+      if (method !== 'regions' && project.premise) {
+        const c = G.premiseCalc(project.premise);
+        tables.push({
+          title: '営業所求積表(壁芯・座標法)',
+          cols: ['点', 'X(m)', 'Y(m)', 'Y次−Y前', 'X×(Y次−Y前)'],
+          align: ['center', 'right', 'right', 'right', 'right'],
+          rows: c.rows.map((r) => [
+            'P' + r.no, r.x.toFixed(2), r.y.toFixed(2), r.dy.toFixed(2), r.prod.toFixed(4),
+          ]),
+          foot: ['倍面積', '', '', c.doubleArea.toFixed(4), c.total.toFixed(2) + ' ㎡'],
+        });
+      }
+    }
+    return tables;
+  }
+
+  /* 1つの求積表を罫線つきで描く。x,y は左上(px)、s は全体縮小係数。 */
+  function drawOneKyusekiTable(ctx, l, x, y, s, base) {
+    const t = l.t;
+    const fp = base.fp * s, tp = base.tp * s, rowH = base.rowH * s,
+          titleH = base.titleH * s, cpx = base.cpx * s;
+    const colW = l.colW.map((c) => c * s);
+    const bodyW = colW.reduce((a, b) => a + b, 0);
+    const nrow = 1 + t.rows.length + (t.foot ? 1 : 0);
+    const top = y + titleH;
+    const tableH = rowH * nrow;
+
+    // タイトル
+    ctx.fillStyle = '#111';
+    ctx.font = `bold ${tp}px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(t.title, x, y + titleH / 2);
+
+    // ヘッダ・合計行の薄い背景
+    ctx.fillStyle = '#eef2f7';
+    ctx.fillRect(x, top, bodyW, rowH);
+    if (t.foot) {
+      ctx.fillStyle = '#f3f4f6';
+      ctx.fillRect(x, top + rowH * (nrow - 1), bodyW, rowH);
+    }
+
+    // 罫線(外枠・横・縦)
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, top, bodyW, tableH);
+    for (let i = 1; i < nrow; i++) {
+      const yy = top + rowH * i;
+      ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + bodyW, yy); ctx.stroke();
+    }
+    let cx = x;
+    for (let i = 0; i < colW.length - 1; i++) {
+      cx += colW[i];
+      ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, top + tableH); ctx.stroke();
+    }
+
+    // セルの文字
+    const drawRow = (cells, ry, bold) => {
+      ctx.font = `${bold ? 'bold ' : ''}${fp}px sans-serif`;
+      ctx.fillStyle = '#111';
+      let colX = x;
+      cells.forEach((c, i) => {
+        const a = (t.align && t.align[i]) || 'left';
+        let tx = colX + cpx;
+        ctx.textAlign = 'left';
+        if (a === 'right') { ctx.textAlign = 'right'; tx = colX + colW[i] - cpx; }
+        else if (a === 'center') { ctx.textAlign = 'center'; tx = colX + colW[i] / 2; }
+        ctx.fillText(String(c), tx, ry + rowH / 2);
+        colX += colW[i];
+      });
+    };
+    let ry = top;
+    drawRow(t.cols, ry, true); ry += rowH;
+    for (const r of t.rows) { drawRow(r, ry, false); ry += rowH; }
+    if (t.foot) drawRow(t.foot, ry, true);
+  }
+
+  /* 求積表(計算過程)を図面そのものに白枠で重ねて描く。
+   * 用紙枠(無ければ画面)の右下に置き、はみ出す場合は全体を自動縮小して収める。 */
+  function drawKyusekiTable(ctx, canvas, project) {
+    const tables = kyusekiSheetTables(project, currentLayer);
+    if (!tables.length) return;
+
+    // 基準サイズ(実寸mm→px)。収まらなければ係数 s を掛けて縮める。
+    const base = {
+      fp: wpx(230), tp: wpx(270), rowH: wpx(360), titleH: wpx(470), cpx: wpx(140),
+    };
+    const padIn = wpx(150), gap = wpx(260);
+
+    ctx.save();
+    // 各表の列幅・高さを測る
+    const layout = tables.map((t) => {
+      const colW = new Array(t.cols.length).fill(0);
+      const measure = (cells, bold) => {
+        ctx.font = `${bold ? 'bold ' : ''}${base.fp}px sans-serif`;
+        cells.forEach((c, i) => {
+          colW[i] = Math.max(colW[i], ctx.measureText(String(c)).width + base.cpx * 2);
+        });
+      };
+      measure(t.cols, true);
+      t.rows.forEach((r) => measure(r, false));
+      if (t.foot) measure(t.foot, true);
+      const bodyW = colW.reduce((a, b) => a + b, 0);
+      const nrow = 1 + t.rows.length + (t.foot ? 1 : 0);
+      return { t, colW, bodyW, h: base.titleH + base.rowH * nrow };
+    });
+
+    const W = Math.max.apply(null, layout.map((l) => l.bodyW)) + padIn * 2;
+    const H = layout.reduce((a, l) => a + l.h, 0) + gap * (layout.length - 1) + padIn * 2;
+
+    // 収める範囲(用紙枠があれば枠、なければ画面全体)
+    let avX, avY, avW, avH;
+    if (project.meta.showPaperFrame) {
+      const f = paperFrameWorld(project);
+      const tl = worldToScreen(f.x, f.y), br = worldToScreen(f.x + f.w, f.y + f.h);
+      avX = tl.x; avY = tl.y; avW = br.x - tl.x; avH = br.y - tl.y;
+    } else {
+      avX = 0; avY = 0; avW = canvas.width; avH = canvas.height;
+    }
+    const margin = wpx(250);
+    const s = Math.min(1, (avW - margin * 2) / W, (avH - margin * 2) / H);
+
+    const w = W * s, h = H * s;
+    const x0 = avX + avW - margin - w;
+    const y0 = avY + avH - margin - h;
+
+    // 背景の白枠
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(x0, y0, w, h);
+    ctx.strokeRect(x0, y0, w, h);
+
+    let y = y0 + padIn * s;
+    const x = x0 + padIn * s;
+    for (const l of layout) {
+      drawOneKyusekiTable(ctx, l, x, y, s, base);
+      y += l.h * s + gap * s;
+    }
+    ctx.restore();
+  }
+
   /* 用紙枠(用紙サイズ×縮尺がカバーする実寸範囲)をワールド座標で返す。
    * 例: A4横・1/50 → 297mm×50 = 14850mm ×、210mm×50 = 10500mm。原点は(0,0)。 */
   function paperFrameWorld(project) {
@@ -1283,6 +1452,11 @@
     // 営業所求積図では壁芯線(求積の根拠になる線)を最前面側に描く
     if (currentLayer === 'premises' && project.premise) {
       drawPremiseCenterline(ctx, project);
+    }
+    // 求積表(計算過程)を図面そのものに重ねる(求積図のみ・設定で切替)
+    if ((currentLayer === 'premises' || currentLayer === 'kyakushitsu') &&
+        project.meta.showKyusekiTable !== false) {
+      drawKyusekiTable(ctx, canvas, project);
     }
     // 手動の寸法線・メモ(この図面に属するもの)は要素の上に描く
     drawManualDims(ctx, project, state);

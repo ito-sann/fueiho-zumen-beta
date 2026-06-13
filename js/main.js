@@ -757,6 +757,7 @@
     $('premMeasured').value = project.premise ? project.premise.measuredAt : 'inner';
     $('deductPillars').checked = m.deductPillars === true;
     $('printTrueScale').checked = m.printTrueScale === true;
+    $('metaKyusekiTable').checked = m.showKyusekiTable !== false;
     syncUnderlayUi();
     // 文字情報も自動保存と履歴の対象にする(店舗名は案件名にもなる)
     $('metaStore').oninput = (e) => { m.storeName = e.target.value; scheduleAutosave(); scheduleHistory(); };
@@ -778,6 +779,8 @@
     $('printTrueScale').onchange = (e) => { m.printTrueScale = e.target.checked; scheduleAutosave(); };
     // 設備図コメントは凡例に即時反映させるため、入力のたびに再描画する
     $('fixNote').oninput = (e) => { m.lightingNote = e.target.value; draw(); };
+    // 求積表(計算過程)を図面に重ねるかの切替。求積図でだけ意味を持つ
+    $('metaKyusekiTable').onchange = (e) => { m.showKyusekiTable = e.target.checked; draw(); };
   }
 
   /* ---- 描画と再計算 ---- */
@@ -941,6 +944,9 @@
     // 見出しもページに合わせる(照明音響図=設備一覧表 / 備品姿図=備品一覧表)
     $('kyusekiHead').textContent =
       layer === 'lighting' ? '設備一覧表' : (layer === 'furnviews' ? '備品一覧表' : '求積表');
+    // 「計算過程を図面に載せる」ボタンは求積図(営業所/客室・調理場)でだけ出す
+    $('kyusekiToggleRow').style.display =
+      (layer === 'premises' || layer === 'kyakushitsu') ? '' : 'none';
     let html;
     if (layer === 'kyakushitsu') {
       // 客室・調理場求積図: 客室と調理場の求積表を別々に出す
