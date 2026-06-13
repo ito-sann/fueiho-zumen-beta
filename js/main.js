@@ -643,6 +643,12 @@
       $('hint').textContent = HINT_DEFAULT;
       return;
     }
+    // 正面・側面の形をなぞる作図は右パネルから操作するので、左のボタンは触らない
+    if (state.draftKind === 'profile') {
+      $('hint').textContent = (state.profileTarget && state.profileTarget.view === 'side' ? '側面' : '正面')
+        + 'の形をなぞる: 姿図の四角に重ねてクリックで角を置く / Enter・最初の点クリックで確定 / Escで中止';
+      return;
+    }
     const btn = state.draftKind === 'premise' ? btnP
       : state.draftKind === 'furniture' ? btnF : btnR;
     if (draft.points.length >= 3) {
@@ -652,6 +658,41 @@
       btn.classList.add('danger');
     }
     $('hint').textContent = HINT_DRAFT;
+  }
+
+  /* 自由な形の備品の「横から見た形」(正面 front / 側面 side)を、備品姿図の画面で
+   * なぞって作る。クリックした世界座標を、その備品の姿図カード内のローカル座標
+   * (x=横位置, y=床からの高さ)に変換して保存する。 */
+  function startProfile(id, view) {
+    if (state.draft) return; // 別の作図中は不可
+    if (R.getLayer() !== 'furnviews') { R.setLayer('furnviews'); buildLayerTabs(); }
+    state.selectedId = id;
+    state.profileTarget = { id, view };
+    state.draftKind = 'profile';
+    I.beginPolygon(state, (worldPts) => {
+      const tgt = state.profileTarget || { id, view };
+      state.profileTarget = null;
+      const found = M.findById(project, id);
+      if (!found) { refresh(); return; }
+      const f = found.element;
+      const layout = R.furnViewLayout(project);
+      const cell = (layout.cells || []).find((c) => c.g.key === G.furnKey(f));
+      if (!cell) { alert('対象の備品が姿図に見つかりませんでした。先に平面図で配置してください。'); refresh(); return; }
+      const left = cell.x + layout.pad;
+      const viewLeft = tgt.view === 'side' ? left + cell.g.w + layout.innerGap : left;
+      const local = worldPts.map((p) => ({
+        x: Math.round(p.x - viewLeft),
+        y: Math.max(0, Math.round(cell.floorY - p.y)), // 床からの高さ(床より下は0)
+      }));
+      f[tgt.view === 'side' ? 'side' : 'front'] = local;
+      // 輪郭の最大高さに高さを合わせる(見通し1m判定・カードの大きさのため)
+      const maxY = local.reduce((m, p) => Math.max(m, p.y), 0);
+      if (maxY > (f.height || 0)) f.height = maxY;
+      state.selectedId = f.id;
+      refresh(); showProps(f);
+    });
+    R.fitToView(project, canvasCss());
+    refresh();
   }
 
   /* 区画の種類が今のレイヤーで非表示なら、平面図に切り替えて見えるようにする */
@@ -1035,6 +1076,7 @@
           <input type="number" step="10" data-vy="${i}" value="${el.y + p.y}" title="Y(mm)"></div>`;
       });
     } else if (kind === 'furniture' || kind === 'fittings') {
+      // (自由な形の備品はここを通らない。下の姿図ボタンへ続く)
       html += propNum(kind === 'fittings' ? '長さ(mm)' : '幅(mm)', 'w', el.w);
       html += propNum(kind === 'fittings' ? '厚み(mm)' : '奥行(mm)', 'h', el.h);
       if (el.kind === 'counterL') {
@@ -1049,6 +1091,22 @@
       const num = G.furnitureNumberMap(project)[el.id];
       html += `<div class="prop-row"><span>番号</span><b id="propFurnNum">${num ? G.code(num) : '—'}</b></div>
         <p class="muted">番号は自動: 同じ種類・同じ寸法は同じ番号。寸法を変えると振り直されます。</p>`;
+    }
+    if (kind === 'furniture' && el.shape === 'polygon') {
+      // 備品姿図の正面・側面に出す「横から見た形」を、姿図画面でなぞって作る
+      const hasF = el.front && el.front.length >= 2;
+      const hasS = el.side && el.side.length >= 2;
+      html += '<div class="prop-row"><span>姿図の形</span><b>'
+        + (hasF ? '正面✓' : '正面—') + ' / ' + (hasS ? '側面✓' : '側面—') + '</b></div>';
+      html += `<div class="add-row">
+        <button class="btn small" id="btnProfFront">${hasF ? '正面を描き直す' : '正面の形を描く'}</button>
+        <button class="btn small" id="btnProfSide">${hasS ? '側面を描き直す' : '側面の形を描く'}</button></div>`;
+      if (hasF || hasS) {
+        html += `<div class="add-row">
+          ${hasF ? '<button class="btn small danger" id="btnProfClearF">正面を消す</button>' : ''}
+          ${hasS ? '<button class="btn small danger" id="btnProfClearS">側面を消す</button>' : ''}</div>`;
+      }
+      html += '<p class="muted">押すと備品姿図に切り替わります。姿図の正面/側面の四角に重ねて、横から見た形をクリックでなぞってください(Enterで確定)。</p>';
     }
     if (kind === 'fixtures') {
       html += propText('ワット数', 'watt', el.watt || '');
@@ -1124,6 +1182,16 @@
         }
       });
     });
+    // 自由な形の備品: 正面・側面の「横から見た形」をなぞる / 消す
+    const bf = box.querySelector('#btnProfFront');
+    if (bf) bf.onclick = () => startProfile(el.id, 'front');
+    const bs = box.querySelector('#btnProfSide');
+    if (bs) bs.onclick = () => startProfile(el.id, 'side');
+    const cf = box.querySelector('#btnProfClearF');
+    if (cf) cf.onclick = () => { el.front = null; refresh(); showProps(el); };
+    const cs = box.querySelector('#btnProfClearS');
+    if (cs) cs.onclick = () => { el.side = null; refresh(); showProps(el); };
+
     // 文字サイズ(Googleドキュメント風)。15が標準で、−/＋は段階リストの
     // 前後のサイズへ移動する。数値の直接入力も可能(6〜96)。標準=15に戻す。
     const fontInput = box.querySelector('#fontInput');

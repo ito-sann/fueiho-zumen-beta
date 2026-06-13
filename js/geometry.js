@@ -314,9 +314,7 @@
     const variant = new Map(); // 種類|幅|奥行|高さ → 番号
     const map = {};
     for (const f of project.furniture) {
-      const key = f.shape === 'polygon'
-        ? `custom|${f.label}|${f.height || 0}|${JSON.stringify(f.points)}`
-        : `${f.kind}|${f.w}|${f.h}|${f.height || 0}`;
+      const key = furnKey(f);
       if (!variant.has(key)) {
         counters[f.kind] = (counters[f.kind] || 0) + 1;
         variant.set(key, counters[f.kind]);
@@ -327,21 +325,29 @@
   }
 
   /* 備品姿図用: 同じ種類・同じ寸法の備品をまとめる(番号は furnitureNumberMap と同じ) */
+  /* 備品をまとめる際のキー。同じ種類・寸法・形・正面/側面の形なら同じ1台として数える。
+   * 自由な形は外形寸法が同じでも形が違えば別物として扱う。 */
+  function furnKey(f) {
+    return f.shape === 'polygon'
+      ? `custom|${f.label}|${f.height || 0}|${JSON.stringify(f.points)}` +
+        `|${JSON.stringify(f.front || null)}|${JSON.stringify(f.side || null)}`
+      : `${f.kind}|${f.w}|${f.h}|${f.height || 0}`;
+  }
+
   function furnitureGroups(project) {
     const limit = global.Model.SIGHTLINE_LIMIT;
     const counters = {};
     const map = new Map();
     for (const f of project.furniture) {
-      // 自由な形は外形寸法が同じでも形が違えば別物として扱う(形+ラベルで区別)
-      const key = f.shape === 'polygon'
-        ? `custom|${f.label}|${f.height || 0}|${JSON.stringify(f.points)}`
-        : `${f.kind}|${f.w}|${f.h}|${f.height || 0}`;
+      const key = furnKey(f);
       if (!map.has(key)) {
         counters[f.kind] = (counters[f.kind] || 0) + 1;
         map.set(key, {
+          key,
           kind: f.kind, label: f.label,
           w: f.w, h: f.h, height: f.height || 0,
           shape: f.shape || 'rect', points: f.points || null,
+          front: f.front || null, side: f.side || null,
           number: counters[f.kind], count: 0,
           over: (f.height || 0) > limit, // 高さ1m超(見通し規制の注意対象)
         });
@@ -460,7 +466,7 @@
     pointInRegion, pillarsInRegion, pillarDeductions, regionNetAreaSqm,
     polygonCalc, polygonEdgesM, polygonPointsM,
     offsetPolygonAbs, premiseCenterlineAbs, premiseWallPolysAbs, premiseRegionLike, premiseCalc,
-    furnitureGroups, furnitureNumberMap,
+    furnitureGroups, furnitureNumberMap, furnKey,
     summary, sightlineWarnings, kyakushitsuSizeWarnings, KYAKUSHITSU_MIN_SQM,
     fixtureSummary, boundingBox,
   };

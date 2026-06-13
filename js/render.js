@@ -914,23 +914,36 @@
       ctx.fillText('1m', m2.x - wpx(60), m2.y - wpx(40));
 
       // --- 正面図(幅 × 高さ) と 側面図(奥行 × 高さ) ---
+      // なぞって描いた形(prof)があればそのシルエットを、なければ外形の四角を描く
       const views = [
-        { x0: left, w: g.w, cap: `正面 幅${G.fmtM(g.w)}m` },
-        { x0: left + g.w + innerGap, w: g.h, cap: `側面 奥行${G.fmtM(g.h)}m` },
+        { x0: left, w: g.w, cap: `正面 幅${G.fmtM(g.w)}m`, prof: g.front },
+        { x0: left + g.w + innerGap, w: g.h, cap: `側面 奥行${G.fmtM(g.h)}m`, prof: g.side },
       ];
       for (const v of views) {
-        const tl = worldToScreen(v.x0, c.floorY - g.height);
-        const br = worldToScreen(v.x0 + v.w, c.floorY);
         ctx.fillStyle = fill;
-        ctx.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
         ctx.strokeStyle = line;
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        if (v.prof && v.prof.length >= 2) {
+          // シルエット(床からの高さ y を floorY から上に取る)
+          ctx.beginPath();
+          v.prof.forEach((pt, i) => {
+            const s = worldToScreen(v.x0 + pt.x, c.floorY - pt.y);
+            if (i) ctx.lineTo(s.x, s.y); else ctx.moveTo(s.x, s.y);
+          });
+          ctx.closePath();
+          ctx.fill(); ctx.stroke();
+        } else {
+          const tl = worldToScreen(v.x0, c.floorY - g.height);
+          const br = worldToScreen(v.x0 + v.w, c.floorY);
+          ctx.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+          ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        }
+        const capX = worldToScreen(v.x0 + v.w / 2, c.floorY);
         ctx.fillStyle = '#1565c0';
         ctx.font = `${fontPx(200)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText(v.cap, (tl.x + br.x) / 2, br.y + wpx(130));
+        ctx.fillText(v.cap, capX.x, capX.y + wpx(130));
       }
       // --- 高さ寸法(側面図の右側に縦書き) ---
       const hx = worldToScreen(left + g.w + innerGap + g.h + 350, c.floorY - g.height / 2);
@@ -1162,6 +1175,8 @@
       drawFurnViews(ctx, canvas, project);
       drawManualDims(ctx, project, state);
       drawNotes(ctx, project, state);
+      // 正面・側面の形をなぞる作図中プレビュー
+      if (state.draft && state.draft.points) drawDraft(ctx, state.draft);
       return;
     }
 
@@ -1236,6 +1251,6 @@
   global.Render = {
     view, LAYERS, setLayer, getLayer, visibility,
     worldToScreen, screenToWorld, fitToView, render,
-    paperFrameWorld, getNorthMark, setRedrawCallback, noteBox,
+    paperFrameWorld, getNorthMark, setRedrawCallback, noteBox, furnViewLayout,
   };
 })(window);
