@@ -29,14 +29,22 @@
     tsuitate: { label: 'つい立て',   w: 900,  h: 40,  height: 1500 },
   };
 
-  /* 建具・設備カタログ(壁に沿って配置する線状の部品。mm) */
+  /* 建具・設備カタログ(壁に沿って配置する線状の部品。mm)
+   * 扉・戸は開き勝手(flip=左右反転 / swing=内外反転)を持ち、製図記号で描く。 */
   const FITTING_CATALOG = {
-    entrance: { label: '出入口', w: 1200, h: 120 },
-    door:     { label: '扉',     w: 800,  h: 120 },
-    window:   { label: '窓',     w: 1650, h: 120 },
-    wall:     { label: '壁',     w: 2000, h: 120 },
-    pillar:   { label: '柱',     w: 300,  h: 300 },
+    entrance:    { label: '出入口',     w: 1200, h: 120 },
+    door:        { label: '片開き扉',   w: 800,  h: 120 },
+    doorDouble:  { label: '両開き扉',   w: 1600, h: 120 },
+    slideSingle: { label: '片引き戸',   w: 900,  h: 120 },
+    slideSplit:  { label: '引き分け戸', w: 1800, h: 120 },
+    slidePass:   { label: '引き違い戸', w: 1700, h: 120 },
+    window:      { label: '窓',         w: 1650, h: 120 },
+    wall:        { label: '壁',         w: 2000, h: 120 },
+    pillar:      { label: '柱',         w: 300,  h: 300 },
   };
+
+  /* 扉・戸(開き勝手の設定を持つ建具)の種類 */
+  const DOOR_KINDS = ['door', 'doorDouble', 'slideSingle', 'slideSplit', 'slidePass'];
 
   /* 照明・音響設備カタログ(点で配置)。symbol は図面上の記号(重複不可)。 */
   const FIXTURE_CATALOG = {
@@ -447,7 +455,7 @@
   }
 
   global.Model = {
-    REGION_TYPES, FURNITURE_CATALOG, FITTING_CATALOG, FIXTURE_CATALOG, PAPER_SIZES,
+    REGION_TYPES, FURNITURE_CATALOG, FITTING_CATALOG, DOOR_KINDS, FIXTURE_CATALOG, PAPER_SIZES,
     SIGHTLINE_LIMIT, CHECKLIST_ITEMS,
     todayStr, defaultProject, nextId, nextRegionNumber,
     addRegion, addPolygonRegion, normalizePolygon, setPremise,

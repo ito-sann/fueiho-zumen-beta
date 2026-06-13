@@ -424,7 +424,51 @@
     ctx.restore();
   }
 
-  /* 建具・設備(出入口・扉・窓・壁・柱)を製図記号で描く */
+  /* 扉・戸の製図記号を「基準向き」で描く(片開き=ヒンジ左・上開き)。
+   * 左右/内外の反転は呼び出し側の ctx.scale で行う。w,h は画面px。 */
+  function drawDoorSymbol(ctx, kind, w, h) {
+    const pt = Math.max(1.5, h * 0.55);  // 引戸パネルの厚み
+    const off = h * 0.5;                  // 引戸の軌道のずらし量(壁線から)
+    // 片開きの葉(ヒンジ hx・閉位置の向き toRight)を描く。開いた向きは上(-y)
+    const swingLeaf = (hx, len, toRight) => {
+      ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx, -len); ctx.stroke(); // 開いた葉
+      ctx.beginPath();
+      if (toRight) ctx.arc(hx, 0, len, -Math.PI / 2, 0);          // 上→右(上開き・ヒンジ左)
+      else ctx.arc(hx, 0, len, Math.PI, 1.5 * Math.PI);          // 左→上(上開き・ヒンジ右)
+      ctx.stroke();
+    };
+    // 引戸パネル(矩形)+スライド方向の矢印。trackY は軌道のy、x0..x1がパネル
+    const slidePanel = (x0, x1, trackY, dir) => {
+      ctx.beginPath();
+      ctx.rect(Math.min(x0, x1), trackY - pt / 2, Math.abs(x1 - x0), pt);
+      ctx.fill(); ctx.stroke();
+      if (dir && Math.abs(x1 - x0) > 14) { // スライド方向の小さな矢印
+        const my = trackY, mx = (x0 + x1) / 2, a = 6;
+        const tx = mx + dir * Math.min(Math.abs(x1 - x0) / 2 - 3, 16);
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, my);
+        ctx.moveTo(tx, my); ctx.lineTo(tx - dir * a, my - a * 0.7);
+        ctx.moveTo(tx, my); ctx.lineTo(tx - dir * a, my + a * 0.7);
+        ctx.stroke();
+      }
+    };
+    if (kind === 'door') {
+      swingLeaf(-w / 2, w, true); // 片開き: ヒンジ左、全幅
+    } else if (kind === 'doorDouble') {
+      swingLeaf(-w / 2, w / 2, true);  // 左の葉
+      swingLeaf(w / 2, w / 2, false);  // 右の葉
+    } else if (kind === 'slideSingle') {
+      slidePanel(-w / 2, w / 2, -off, -1); // 1枚・全幅、左へ引く
+    } else if (kind === 'slideSplit') {
+      slidePanel(-w / 2, 0, -off, -1);     // 左半分→左へ
+      slidePanel(0, w / 2, -off, 1);       // 右半分→右へ
+    } else if (kind === 'slidePass') {
+      const L = w * 0.55;                  // 重なるよう半分より長め
+      slidePanel(-w / 2, -w / 2 + L, -off, -1); // 奥の建具(上の軌道)
+      slidePanel(w / 2 - L, w / 2, off, 1);     // 手前の建具(下の軌道)
+    }
+  }
+
+  /* 建具・設備(出入口・扉・戸・窓・壁・柱)を製図記号で描く */
   function drawFitting(ctx, g, opts) {
     const sc = worldToScreen(g.x + g.w / 2, g.y + g.h / 2);
     const w = g.w * view.zoom, h = g.h * view.zoom;
@@ -451,13 +495,19 @@
       ctx.moveTo(-w / 2, -h * 0.16); ctx.lineTo(w / 2, -h * 0.16);
       ctx.moveTo(-w / 2, h * 0.16);  ctx.lineTo(w / 2, h * 0.16);
       ctx.stroke();
-    } else if (g.kind === 'door') {
-      // 開口の下枠 + 扉の葉 + 開閉軌跡(円弧)
-      const hx = -w / 2; // ヒンジ(左端)
+    } else if (global.Model.DOOR_KINDS.indexOf(g.kind) >= 0) {
+      // 扉・戸の製図記号。開き勝手は flip(左右) / swing(内外) で反転する
       ctx.strokeStyle = line;
-      ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(w / 2, 0); ctx.stroke(); // 開口
-      ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx, -w); ctx.stroke();       // 葉(開いた状態)
-      ctx.beginPath(); ctx.arc(hx, 0, w, -Math.PI / 2, 0); ctx.stroke();          // 軌跡
+      ctx.fillStyle = sel ? 'rgba(211,47,47,.12)' : 'rgba(255,255,255,0.9)';
+      // 開口の両端(ジャム)
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(-w / 2, h / 2);
+      ctx.moveTo(w / 2, -h / 2);  ctx.lineTo(w / 2, h / 2);
+      ctx.stroke();
+      ctx.save();
+      ctx.scale(g.flip ? -1 : 1, g.swing ? -1 : 1); // 開き勝手
+      drawDoorSymbol(ctx, g.kind, w, h);
+      ctx.restore();
     } else if (g.kind === 'entrance') {
       // 開口(両端のジャム)+ 出入りの両矢印 + ラベル
       ctx.strokeStyle = line;

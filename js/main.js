@@ -1085,6 +1085,13 @@
         html += propNum('カウンター幅(mm)', 't', el.t || 600);
       }
       html += propNum('角度(度)', 'rotation', el.rotation || 0);
+      // 扉・戸は開き勝手(開く方向)を切り替えられる
+      if (M.DOOR_KINDS.indexOf(el.kind) >= 0) {
+        const slide = el.kind !== 'door' && el.kind !== 'doorDouble';
+        html += `<label class="check-row"><input type="checkbox" data-fieldbool="flip" ${el.flip ? 'checked' : ''}> ${slide ? '引く向きを左右反転' : '吊元(ヒンジ)を左右反転'}</label>`;
+        html += `<label class="check-row"><input type="checkbox" data-fieldbool="swing" ${el.swing ? 'checked' : ''}> 開く向きを内・外で反転</label>`;
+        html += '<p class="muted">壁に沿う向きは「角度」で、開く方向は上の2つのチェックで調整します。</p>';
+      }
     }
     if (kind === 'furniture') {
       html += propNum('高さ(mm)', 'height', el.height || 0);
@@ -1183,6 +1190,14 @@
         }
       });
     });
+    // チェックボックス式のプロパティ(扉の開き勝手 flip / swing など)
+    box.querySelectorAll('[data-fieldbool]').forEach((inp) => {
+      inp.addEventListener('change', (e) => {
+        el[e.target.dataset.fieldbool] = e.target.checked;
+        refresh();
+      });
+    });
+
     // 自由な形の備品: 正面・側面の「横から見た形」をなぞる / 消す
     const bf = box.querySelector('#btnProfFront');
     if (bf) bf.onclick = () => startProfile(el.id, 'front');
