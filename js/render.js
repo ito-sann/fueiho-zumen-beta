@@ -1412,7 +1412,7 @@
     fontScale = (project.meta.fontScale || 100) / 100; // 全体の文字サイズ設定を反映
     clear(ctx, canvas);
     drawGrid(ctx, canvas);
-    if (project.meta.showPaperFrame) {
+    if (project.meta.showPaperFrame && !(opts && opts.hidePaperFrame)) {
       drawPaperFrame(ctx, project);
     }
 

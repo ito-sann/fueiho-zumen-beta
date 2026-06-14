@@ -1,6 +1,6 @@
 /* =========================================================================
  * print.js — 提出用の印刷 / PDF 出力(ブラウザの「PDFに保存」を利用)。
- * 図枠・表題欄・求積表を組み立ててから window.print() を呼ぶ。
+ * 用紙枠内だけをオフスクリーン描画し、window.print() を呼ぶ。
  * 1枚ずつの出力(printCurrent)と、届出に必要な全図面の一括出力(printAll)。
  * ========================================================================= */
 (function (global) {
@@ -168,6 +168,13 @@
     ));
   }
 
+  function pageSizeMm(project) {
+    const m = project.meta;
+    const p = global.Model.PAPER_SIZES[m.paper] || global.Model.PAPER_SIZES.A4;
+    const landscape = m.orientation !== 'portrait';
+    return { w: landscape ? p.w : p.h, h: landscape ? p.h : p.w };
+  }
+
   /* 用紙の印刷可能サイズ(mm)。実寸縮尺のはみ出し判定に使う。 */
   function printableSize(project) {
     const m = project.meta;
@@ -210,6 +217,15 @@
 </div>`;
   }
 
+  /* 用紙枠だけを1ページとして出す。表や表題欄はここでは追加しない。 */
+  function frameSheetHtml(project, layer, img) {
+    const drawingName = global.Render.LAYERS[layer].label;
+    return `
+<div class="sheet">
+  <img src="${img.dataURL}" alt="${escapeHtml(drawingName)}">
+</div>`;
+  }
+
   /* 印刷用ウィンドウの共通ガワ */
   function openWindow(project, title, bodyHtml) {
     const win = window.open('', '_blank');
@@ -219,37 +235,20 @@
     }
     const landscape = project.meta.orientation === 'landscape';
     const size = project.meta.paper + (landscape ? ' landscape' : ' portrait');
-    // 実寸縮尺のときは、印刷倍率100%(実際のサイズ)で出すよう案内する
-    const scaleNotice = project.meta.printTrueScale
-      ? '<div class="noprint scale-note">⚠ 実寸の縮尺で出力します。印刷ダイアログの倍率は「100%(実際のサイズ/拡大縮小なし)」にしてください。定規で測ると図面が1/' +
-        project.meta.scale + 'になります。</div>'
-      : '';
+    const page = pageSizeMm(project);
+    const scaleNotice = '<div class="noprint scale-note">用紙枠内だけをPDF出力します。印刷する場合は倍率を「100%(実際のサイズ/拡大縮小なし)」にしてください。定規で測ると図面が1/' +
+      project.meta.scale + 'になります。</div>';
 
     win.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
 <title>${escapeHtml(title)}</title>
 <style>
-  @page { size: ${size}; margin: 8mm; }
+  @page { size: ${size}; margin: 0; }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, "Hiragino Sans", sans-serif; margin: 0; color: #111; }
-  .sheet { border: 2px solid #111; padding: 6mm; break-after: page; page-break-after: always; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #111; }
+  body { font-family: -apple-system, "Hiragino Sans", sans-serif; }
+  .sheet { width: ${page.w}mm; height: ${page.h}mm; overflow: hidden; break-after: page; page-break-after: always; }
   .sheet:last-child { break-after: auto; page-break-after: auto; }
-  .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4mm; }
-  .head h1 { font-size: 16pt; margin: 0; }
-  .head .scale { font-size: 11pt; }
-  .drawing { text-align: center; }
-  .drawing img { max-width: 100%; max-height: 145mm; border: 1px solid #ccc; }
-  .drawing img.scaled { max-width: none; max-height: none; } /* 実寸縮尺は物理サイズ指定を優先 */
-  .scale-warn { color: #b91c1c; font-weight: bold; font-size: 9pt; margin: 0 0 2mm; }
-  .bottom { display: flex; gap: 6mm; margin-top: 4mm; align-items: flex-start; }
-  table { border-collapse: collapse; font-size: 9pt; }
-  .kyuseki { width: 100%; margin-bottom: 3mm; }
-  .kyuseki caption { text-align: left; font-weight: bold; margin-bottom: 2mm; }
-  .kyuseki th, .kyuseki td { border: 1px solid #333; padding: 2px 6px; }
-  .kyuseki .num { text-align: right; }
-  .kyuseki tfoot td { font-weight: bold; }
-  .titleblock { width: 100%; }
-  .titleblock th, .titleblock td { border: 1px solid #333; padding: 3px 6px; font-size: 9pt; }
-  .titleblock th { background: #f2f2f2; white-space: nowrap; text-align: left; }
+  .sheet img { display: block; width: 100%; height: 100%; }
   @media print { .noprint { display: none; } }
   .noprint { text-align: center; padding: 8px; }
   .noprint button { font-size: 13px; padding: 6px 16px; cursor: pointer; }
@@ -316,15 +315,55 @@ ${bodyHtml}
     return out;
   }
 
+  /* 用紙枠のワールド座標だけを切り出して、用紙と同じ縦横比の画像にする。 */
+  function renderPaperFrameImage(project, layer) {
+    const R = global.Render;
+    const prevLayer = R.getLayer();
+    const v = R.view;
+    const prev = { zoom: v.zoom, offsetX: v.offsetX, offsetY: v.offsetY };
+    const savedFrame = project.meta.showPaperFrame;
+    try {
+      R.setLayer(layer);
+      project.meta.showPaperFrame = true;
+
+      const page = pageSizeMm(project);
+      const pxPerMm = 240 / 25.4;
+      const maxLong = 4200;
+      let cw = Math.round(page.w * pxPerMm);
+      let ch = Math.round(page.h * pxPerMm);
+      const long = Math.max(cw, ch);
+      if (long > maxLong) {
+        const ratio = maxLong / long;
+        cw = Math.round(cw * ratio);
+        ch = Math.round(ch * ratio);
+      }
+
+      const frame = R.paperFrameWorld(project);
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(1, cw);
+      cv.height = Math.max(1, ch);
+      const ctx = cv.getContext('2d');
+      v.zoom = cv.width / frame.w;
+      v.offsetX = -frame.x * v.zoom;
+      v.offsetY = -frame.y * v.zoom;
+      R.render(ctx, cv, project, { selectedId: null }, { print: true, hidePaperFrame: true });
+      return { dataURL: cv.toDataURL('image/png') };
+    } finally {
+      project.meta.showPaperFrame = savedFrame;
+      R.setLayer(prevLayer);
+      v.zoom = prev.zoom; v.offsetX = prev.offsetX; v.offsetY = prev.offsetY;
+    }
+  }
+
   /* 現在の図面(レイヤー)を印刷する。
    * 画面のキャンバスではなくオフスクリーンで描き直すことで、
    * 下絵(トレース画像)や画面のパン・ズーム状態に左右されない出力にする。 */
   function printCurrent(project, canvas) {
     const layer = global.Render.getLayer();
     const drawingName = global.Render.LAYERS[layer].label;
-    const img = renderLayerImage(project, layer);
+    const img = renderPaperFrameImage(project, layer);
     const title = fileTitle(project, drawingName);
-    openWindow(project, title, sheetHtml(project, layer, img));
+    openWindow(project, title, frameSheetHtml(project, layer, img));
   }
 
   /* 届出に必要な全図面(平面図・営業所求積図・客室・調理場求積図・照明音響設備図)を
@@ -332,7 +371,7 @@ ${bodyHtml}
   function printAll(project) {
     const layers = Object.keys(global.Render.LAYERS);
     const body = layers
-      .map((layer) => sheetHtml(project, layer, renderLayerImage(project, layer)))
+      .map((layer) => frameSheetHtml(project, layer, renderPaperFrameImage(project, layer)))
       .join('\n');
     const title = fileTitle(project, '図面一式');
     openWindow(project, title, body);
