@@ -1058,6 +1058,7 @@
       const opts = Object.entries(M.REGION_TYPES).map(([k, v]) =>
         `<option value="${k}"${el.type === k ? ' selected' : ''}>${v.label}</option>`).join('');
       html = `<div class="prop-row"><span>種別</span><select id="propType">${opts}</select></div>`;
+      html += `<label class="check-row"><input type="checkbox" data-fieldbool="showLabel" ${el.showLabel ? 'checked' : ''}> 区画名を図面に表示</label>`;
     } else {
       html = `<div class="prop-row"><span>種別</span><b>${kindLabel(el, kind)}</b></div>`;
     }

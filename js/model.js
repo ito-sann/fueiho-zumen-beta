@@ -385,6 +385,7 @@
       shape: shape || 'rect',     // 'rect' | 'triangle' | 'trapezoid'
       w2: w2 != null ? w2 : Math.round(w / 2), // 台形の上底(mm)
       rotation: 0,
+      showLabel: false,
       color: t.color,
     };
     project.regions.push(region);
@@ -410,6 +411,7 @@
       shape: 'polygon',
       points: pointsAbs.map((p) => ({ x: p.x - minX, y: p.y - minY })),
       rotation: 0,
+      showLabel: false,
       color: t.color,
     };
     normalizePolygon(region);

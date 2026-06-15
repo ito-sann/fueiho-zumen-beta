@@ -165,6 +165,10 @@
     return (r.points || []).map((p) => worldToScreen(r.x + p.x, r.y + p.y));
   }
 
+  function shouldDrawRegionLabel(r) {
+    return r.showLabel === true;
+  }
+
   /* 多角形区画を描く(塗り・輪郭・ラベル・選択時は頂点ハンドル) */
   function drawPolygonRegion(ctx, r, opts) {
     const pts = polygonScreenPts(r);
@@ -183,14 +187,16 @@
     ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : (opts.stroke || '#333'));
     ctx.stroke();
-    // ラベルは重心に置く(既定320mm相当・全体設定・個別指定で調整可)
-    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-    ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
-    ctx.font = `${fontPx(320, r)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText((opts.code ? opts.code + ' ' : '') + r.label, cx, cy);
+    if (shouldDrawRegionLabel(r)) {
+      // ラベルは重心に置く(既定320mm相当・全体設定・個別指定で調整可)
+      const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+      const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+      ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
+      ctx.font = `${fontPx(320, r)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText((opts.code ? opts.code + ' ' : '') + r.label, cx, cy);
+    }
     // 選択中は頂点ハンドル(ドラッグで形を修正できる)
     if (opts.selected) {
       for (const p of pts) {
@@ -282,13 +288,15 @@
     ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : (opts.stroke || '#333'));
     ctx.stroke();
-    // ラベル(符号つき)。既定は実寸320mm相当(全体設定・個別指定で調整可)
-    ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
-    ctx.font = `${fontPx(320, r)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const label = (opts.code ? opts.code + ' ' : '') + r.label;
-    ctx.fillText(label, 0, 0);
+    if (shouldDrawRegionLabel(r)) {
+      // ラベル(符号つき)。既定は実寸320mm相当(全体設定・個別指定で調整可)
+      ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
+      ctx.font = `${fontPx(320, r)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const label = (opts.code ? opts.code + ' ' : '') + r.label;
+      ctx.fillText(label, 0, 0);
+    }
     ctx.restore();
   }
 
