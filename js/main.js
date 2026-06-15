@@ -418,6 +418,7 @@
       state.selectedId = r.id;
       refresh(); showProps(r);
     };
+    $('regionType').onchange = applyRegionTypeDefaults;
     // 台形のときだけ「上底」入力欄を表示
     $('regionShape').onchange = (e) => {
       $('regionW2Row').style.display = e.target.value === 'trapezoid' ? '' : 'none';
@@ -722,6 +723,15 @@
     }
   }
 
+  function applyRegionTypeDefaults() {
+    const t = M.REGION_TYPES[$('regionType').value];
+    if (!t || !t.defaultW || !t.defaultH) return;
+    $('regionShape').value = 'rect';
+    $('regionW').value = t.defaultW;
+    $('regionH').value = t.defaultH;
+    $('regionW2Row').style.display = 'none';
+  }
+
   function clampSize(v) {
     let n = parseInt(v, 10);
     if (!isFinite(n) || n < 100) n = 100;
@@ -926,6 +936,7 @@
   function coordTablesHtml(filterTypes) {
     return project.regions
       .filter((r) => r.shape === 'polygon' &&
+        !G.isPillarRegion(r) &&
         (!filterTypes || filterTypes.indexOf(r.type) >= 0))
       .map(coordTableHtml).join('');
   }

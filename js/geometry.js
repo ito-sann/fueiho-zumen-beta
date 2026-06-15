@@ -99,7 +99,23 @@
 
   /* 区画の面積(㎡・小数第4位) */
   function regionAreaSqm(region) {
+    if (isPillarRegion(region)) return 0;
     return regionCalc(region).area4;
+  }
+
+  function isPillarRegion(region) {
+    return region && region.type === 'pillar';
+  }
+
+  function regionCenter(region) {
+    if (region.shape === 'polygon' && (region.points || []).length) {
+      const pts = region.points || [];
+      return {
+        x: region.x + pts.reduce((s, p) => s + p.x, 0) / pts.length,
+        y: region.y + pts.reduce((s, p) => s + p.y, 0) / pts.length,
+      };
+    }
+    return { x: region.x + region.w / 2, y: region.y + region.h / 2 };
   }
 
   /* 1区画 → 求積表の1行 */
@@ -124,10 +140,16 @@
   function buildTable(project, filterTypes) {
     const rows = [];
     let totalCalc = 0;
-    project.regions.forEach((r, i) => {
+    const codeMap = new Map();
+    let codeNo = 0;
+    project.regions.forEach((r) => {
+      if (!isPillarRegion(r)) codeMap.set(r.id, code(++codeNo));
+    });
+    project.regions.forEach((r) => {
+      if (isPillarRegion(r)) return;
       if (filterTypes && filterTypes.indexOf(r.type) < 0) return;
       const row = regionRow(r);
-      row.code = code(i + 1);
+      row.code = codeMap.get(r.id) || '';
       rows.push(row);
       totalCalc += row.area;
       for (const d of pillarDeductions(project, r)) {
@@ -185,9 +207,16 @@
 
   /* 区画の中に立っている柱(中心点で判定)を返す */
   function pillarsInRegion(project, region) {
-    return (project.fittings || []).filter((g) =>
+    if (isPillarRegion(region)) return [];
+    const legacyFittings = (project.fittings || []).filter((g) =>
       g.kind === 'pillar' &&
       pointInRegion(region, g.x + g.w / 2, g.y + g.h / 2));
+    const regionPillars = (project.regions || []).filter((r) => {
+      if (!isPillarRegion(r)) return false;
+      const c = regionCenter(r);
+      return pointInRegion(region, c.x, c.y);
+    });
+    return legacyFittings.concat(regionPillars);
   }
 
   /* 区画1つ分の柱の控除行。同じ寸法の柱はまとめて「0.30 × 0.30 × 2本」にする。
@@ -196,15 +225,16 @@
     if (!project.meta || !project.meta.deductPillars) return [];
     const groups = new Map();
     for (const g of pillarsInRegion(project, region)) {
-      const key = `${g.w}|${g.h}`;
-      if (!groups.has(key)) groups.set(key, { w: g.w, h: g.h, count: 0 });
+      const calc = g.kind === 'pillar'
+        ? { area4: round4(mmToM(g.w) * mmToM(g.h)), expr: `${fmtM(g.w)} × ${fmtM(g.h)}` }
+        : regionCalc(g);
+      const key = `${calc.expr}|${calc.area4}`;
+      if (!groups.has(key)) groups.set(key, { expr: calc.expr, area: calc.area4, count: 0 });
       groups.get(key).count++;
     }
     return Array.from(groups.values()).map((g) => {
-      const wM = mmToM(g.w), hM = mmToM(g.h);
-      const one = round4(wM * hM);
-      const area = round4(one * g.count);
-      const expr = `${wM.toFixed(2)} × ${hM.toFixed(2)}` +
+      const area = round4(g.area * g.count);
+      const expr = g.expr +
         (g.count > 1 ? ` × ${g.count}本` : '');
       return {
         id: null,
@@ -219,6 +249,7 @@
 
   /* 柱の控除後の区画面積(㎡・第4位)。設定が無効なら通常の面積と同じ。 */
   function regionNetAreaSqm(project, region) {
+    if (isPillarRegion(region)) return 0;
     let a = regionAreaSqm(region);
     for (const d of pillarDeductions(project, region)) a = round4(a + d.area);
     return a;
@@ -468,6 +499,7 @@
 
   global.Geometry = {
     mmToM, fmtM, code, regionCalc, regionAreaSqm, regionRow, buildTable,
+    isPillarRegion,
     pointInRegion, pillarsInRegion, pillarDeductions, regionNetAreaSqm,
     polygonCalc, polygonEdgesM, polygonPointsM,
     offsetPolygonAbs, premiseCenterlineAbs, premiseWallPolysAbs, premiseRegionLike, premiseCalc,

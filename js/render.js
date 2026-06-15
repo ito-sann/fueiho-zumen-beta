@@ -169,6 +169,10 @@
     return r.showLabel === true;
   }
 
+  function isPillarRegion(r) {
+    return global.Geometry.isPillarRegion && global.Geometry.isPillarRegion(r);
+  }
+
   /* 多角形区画を描く(塗り・輪郭・ラベル・選択時は頂点ハンドル) */
   function drawPolygonRegion(ctx, r, opts) {
     const pts = polygonScreenPts(r);
@@ -1453,8 +1457,13 @@
     // highlightTypes がある図面では、対象の区画だけ強調し、他は薄く描いて間取りを示す
     const isMain = (r) => !vis.highlightTypes || vis.highlightTypes.indexOf(r.type) >= 0;
 
+    const regionCodeMap = new Map();
+    let regionCodeNo = 0;
+    for (const r of project.regions) {
+      if (!isPillarRegion(r)) regionCodeMap.set(r.id, global.Geometry.code(++regionCodeNo));
+    }
     for (const r of regions) {
-      const code = global.Geometry.code(project.regions.indexOf(r) + 1); // 符号①②③…
+      const code = regionCodeMap.get(r.id) || ''; // 柱は求積符号を振らない
       drawRegion(ctx, r, {
         fill: vis.regionsFill,
         muted: !isMain(r),

@@ -13,6 +13,7 @@
     tsuro:       { label: '通路',   color: '#f0f4c3' },
     soko:        { label: '倉庫',   color: '#d7ccc8' },
     other:       { label: 'その他', color: '#eeeeee' },
+    pillar:      { label: '柱',     color: '#b0bec5', defaultW: 300, defaultH: 300 },
   };
 
   /* 備品カタログ(mm)。height は見通し規制の判定に使う高さ。 */
@@ -219,7 +220,6 @@
     slidePass:   { label: '引き違い戸', w: 1700, h: 120 },
     window:      { label: '窓',         w: 1650, h: 120 },
     wall:        { label: '壁',         w: 2000, h: 120 },
-    pillar:      { label: '柱',         w: 300,  h: 300 },
   };
 
   /* 扉・戸(開き勝手の設定を持つ建具)の種類 */

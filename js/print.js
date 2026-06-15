@@ -39,6 +39,7 @@
   /* 多角形の座標求積表(頂点番号は図面の P1, P2 … と対応) */
   function coordTablesHtml(project, filterTypes) {
     const polys = project.regions.filter((r) => r.shape === 'polygon' &&
+      !global.Geometry.isPillarRegion(r) &&
       (!filterTypes || filterTypes.indexOf(r.type) >= 0));
     return polys.map((r) => {
       const c = global.Geometry.polygonCalc(r);
