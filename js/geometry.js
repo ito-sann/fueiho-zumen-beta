@@ -441,19 +441,25 @@
   function fixtureSummary(project) {
     const cat = global.Model.FIXTURE_CATALOG;
     const map = new Map();
+    const overrides = (project.meta && project.meta.fixtureCountOverrides) || {};
     for (const x of project.fixtures) {
       if (!map.has(x.kind)) {
         const c = cat[x.kind] || {};
-        map.set(x.kind, { kind: x.kind, label: c.label || x.label, symbol: c.symbol || '?', count: 0, watts: new Set() });
+        map.set(x.kind, { kind: x.kind, label: c.label || x.label, symbol: c.symbol || '?', autoCount: 0, watts: new Set() });
       }
       const g = map.get(x.kind);
-      g.count++;
+      g.autoCount++;
       if (x.watt) g.watts.add(String(x.watt));
     }
-    return Array.from(map.values()).map((g) => ({
-      kind: g.kind, label: g.label, symbol: g.symbol, count: g.count,
-      watt: Array.from(g.watts).join(', '),
-    }));
+    return Array.from(map.values()).map((g) => {
+      const manual = Object.prototype.hasOwnProperty.call(overrides, g.kind);
+      const count = manual ? Math.max(0, parseInt(overrides[g.kind], 10) || 0) : g.autoCount;
+      return {
+        kind: g.kind, label: g.label, symbol: g.symbol,
+        count, autoCount: g.autoCount, manualCount: manual,
+        watt: Array.from(g.watts).join(', '),
+      };
+    });
   }
 
   /* 全要素のバウンディングボックス(mm)。空なら既定値。 */

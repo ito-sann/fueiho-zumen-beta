@@ -903,8 +903,15 @@
   /* 照明・音響設備一覧表(設備図に添える) */
   function fixtureTableHtml() {
     const list = G.fixtureSummary(project);
-    let rows = list.map((g) =>
-      `<tr><td>${esc(g.symbol)}</td><td>${esc(g.label)}</td><td>${g.count}</td><td>${esc(g.watt || '—')}</td></tr>`).join('');
+    let rows = list.map((g) => {
+      const title = g.manualCount
+        ? `手入力中。空欄にすると自動集計(${g.autoCount})へ戻ります`
+        : `自動集計: ${g.autoCount}。数字を入れると手入力できます`;
+      return `<tr><td>${esc(g.symbol)}</td><td>${esc(g.label)}</td>
+        <td><input type="number" min="0" step="1" class="fixture-count-input"
+          data-fixture-count="${esc(g.kind)}" value="${g.count}" title="${esc(title)}"></td>
+        <td>${esc(g.watt || '—')}</td></tr>`;
+    }).join('');
     if (!rows) rows = '<tr><td colspan="4" class="muted">設備がありません</td></tr>';
     return `
       <div class="kyuseki-title">照明・音響設備一覧表</div>
@@ -1012,6 +1019,30 @@
       html = parts.join('');
     }
     $('kyusekiBox').innerHTML = html;
+    if (layer === 'lighting') bindFixtureCountInputs();
+  }
+
+  function bindFixtureCountInputs() {
+    $('kyusekiBox').querySelectorAll('[data-fixture-count]').forEach((inp) => {
+      inp.addEventListener('input', (e) => {
+        const kind = e.target.dataset.fixtureCount;
+        project.meta.fixtureCountOverrides = project.meta.fixtureCountOverrides || {};
+        if (e.target.value === '') {
+          delete project.meta.fixtureCountOverrides[kind];
+        } else {
+          const n = Math.max(0, Math.round(parseFloat(e.target.value) || 0));
+          project.meta.fixtureCountOverrides[kind] = n;
+        }
+        draw();
+      });
+      inp.addEventListener('change', (e) => {
+        if (e.target.value === '') {
+          renderKyuseki();
+          return;
+        }
+        e.target.value = String(Math.max(0, Math.round(parseFloat(e.target.value) || 0)));
+      });
+    });
   }
 
   function renderWarnings() {

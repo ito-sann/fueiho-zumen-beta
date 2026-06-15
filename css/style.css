@@ -122,6 +122,10 @@ table.kyuseki { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.kyuseki th, table.kyuseki td { border: 1px solid #e2e8f0; padding: 4px 6px; text-align: left; }
 table.kyuseki thead th { background: #f8fafc; }
 table.kyuseki tfoot td { font-weight: 700; background: #f1f5f9; }
+.fixture-count-input {
+  width: 56px; min-width: 0; margin: 0; padding: 2px 4px;
+  text-align: right; font-size: 12px;
+}
 
 .warn .ok { color: #15803d; font-size: 12px; margin: 0 0 4px; }
 .warn .ng { color: #b91c1c; font-size: 12px; font-weight: 600; margin: 0 0 4px; }

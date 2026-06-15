@@ -80,14 +80,14 @@
    * watt は空でない値を重複なく集めて併記する。該当なしなら空文字。 */
   function fixtureSummaryText(project, kinds) {
     const catalog = global.Model.FIXTURE_CATALOG;
-    // kind → { count, watts(Set) } の集計
+    const summaries = global.Geometry.fixtureSummary(project)
+      .filter((g) => kinds.indexOf(g.kind) >= 0);
     const agg = {};
-    for (const x of project.fixtures) {
-      if (kinds.indexOf(x.kind) < 0) continue;
-      if (!agg[x.kind]) agg[x.kind] = { count: 0, watts: [] };
-      agg[x.kind].count++;
-      const w = String(x.watt || '').trim();
-      if (w && agg[x.kind].watts.indexOf(w) < 0) agg[x.kind].watts.push(w);
+    for (const g of summaries) {
+      agg[g.kind] = {
+        count: g.count,
+        watts: String(g.watt || '').split(',').map((w) => w.trim()).filter(Boolean),
+      };
     }
     const parts = [];
     for (const kind of kinds) {
