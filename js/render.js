@@ -601,7 +601,7 @@
       align: ['center', 'left', 'left', 'right'],
       rows: t.rows.map((r) => [
         r.code, r.label, r.expr,
-        r.area < 0 ? '△' + Math.abs(r.area).toFixed(2) : r.area.toFixed(2),
+        r.area < 0 ? '△' + Math.abs(r.area).toFixed(4) : r.area.toFixed(4),
       ]),
       foot: ['合計', '', '', t.total.toFixed(2) + ' ㎡'],
     });
