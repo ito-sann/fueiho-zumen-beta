@@ -191,6 +191,7 @@
     buildSelects();
     buildLayerTabs();
     bindToolbar();
+    syncBoundaryDefaults();
     bindMeta();
     buildCaseSelect();
     resizeCanvas();
@@ -443,6 +444,26 @@
       });
       draw();
     };
+    $('boundaryAreaUse').onchange = syncBoundaryDefaults;
+    $('btnDrawBoundaryArea').onclick = () => {
+      if (state.draft) {
+        if (state.draftKind !== 'boundaryArea') return; // 他の作図中は面積囲い線ボタンを無効に
+        if (state.draft.points.length >= 3) I.finishPolygon(state);
+        else I.cancelPolygon(state);
+        draw();
+        return;
+      }
+      const use = $('boundaryAreaUse').value;
+      ensureRegionVisible(boundaryRegionType(use));
+      state.draftKind = 'boundaryArea';
+      I.beginPolygon(state, (pts) => {
+        const r = M.addPolygonRegion(project, boundaryRegionType(use), pts);
+        applyBoundaryRegionStyle(r, use);
+        state.selectedId = r.id;
+        refresh(); showProps(r);
+      });
+      draw();
+    };
     // 営業所外周(壁芯)の作図。区画の多角形と同じ操作で外周をなぞる。
     $('btnDrawPremise').onclick = () => {
       if (state.draft) {
@@ -649,12 +670,15 @@
   const HINT_DRAFT = '多角形の作図中: クリックで角を置く / 最初の点をクリック・ダブルクリック・Enterで確定 / Escで中止';
   function setDraftUi(draft) {
     const btnR = $('btnDrawPoly');
+    const btnB = $('btnDrawBoundaryArea');
     const btnP = $('btnDrawPremise');
     const btnF = $('btnDrawFurnPoly');
     btnR.textContent = '多角形で描く';
+    btnB.textContent = '面積囲い線で描く';
     btnP.textContent = '外周を多角形で描く';
     btnF.textContent = '自由な形で描く(真上から)';
     btnR.classList.remove('danger');
+    btnB.classList.remove('danger');
     btnP.classList.remove('danger');
     btnF.classList.remove('danger');
     if (!draft) {
@@ -669,7 +693,8 @@
       return;
     }
     const btn = state.draftKind === 'premise' ? btnP
-      : state.draftKind === 'furniture' ? btnF : btnR;
+      : state.draftKind === 'furniture' ? btnF
+      : state.draftKind === 'boundaryArea' ? btnB : btnR;
     if (draft.points.length >= 3) {
       btn.textContent = '作図を確定';
     } else {
@@ -721,6 +746,36 @@
       R.setLayer('plan');
       buildLayerTabs();
     }
+  }
+
+  const BOUNDARY_AREA_DEFAULTS = {
+    premises: { type: 'premisesArea', label: '営業所囲い', color: '#1d4ed8' },
+    kyakushitsu: { type: 'kyakushitsu', label: '客室囲い', color: '#e53935' },
+    chubo: { type: 'chubo', label: '調理場囲い', color: '#2e7d32' },
+  };
+
+  function boundaryRegionType(use) {
+    return (BOUNDARY_AREA_DEFAULTS[use] || BOUNDARY_AREA_DEFAULTS.kyakushitsu).type;
+  }
+
+  function boundaryColorForUse(use) {
+    return (BOUNDARY_AREA_DEFAULTS[use] || BOUNDARY_AREA_DEFAULTS.kyakushitsu).color;
+  }
+
+  function syncBoundaryDefaults() {
+    const d = BOUNDARY_AREA_DEFAULTS[$('boundaryAreaUse').value] || BOUNDARY_AREA_DEFAULTS.kyakushitsu;
+    $('boundaryLineColor').value = d.color;
+  }
+
+  function applyBoundaryRegionStyle(region, use) {
+    const d = BOUNDARY_AREA_DEFAULTS[use] || BOUNDARY_AREA_DEFAULTS.kyakushitsu;
+    region.boundaryOnly = true;
+    region.areaUse = use;
+    region.label = d.label;
+    region.showLabel = false;
+    region.color = d.color;
+    region.boundaryColor = $('boundaryLineColor').value || d.color;
+    region.boundaryLineStyle = $('boundaryLineStyle').value || 'solid';
   }
 
   function applyRegionTypeDefaults() {
@@ -952,10 +1007,12 @@
 
   /* 指定の種類に含まれる多角形すべての座標求積表 */
   function coordTablesHtml(filterTypes) {
+    const premiseBoundaryMode = !filterTypes && G.hasPremisesAreaBoundary(project);
     return project.regions
       .filter((r) => r.shape === 'polygon' &&
         !G.isPillarRegion(r) &&
         G.areaUseForRegion(r) !== 'display' &&
+        (!premiseBoundaryMode || G.isPremisesAreaBoundary(r)) &&
         (!filterTypes || filterTypes.indexOf(G.areaUseForRegion(r)) >= 0))
       .map(coordTableHtml).join('');
   }
@@ -1146,6 +1203,16 @@
       const areaOpts = Object.entries(M.AREA_USES).map(([k, v]) =>
         `<option value="${k}"${(el.areaUse || 'auto') === k ? ' selected' : ''}>${v.label}</option>`).join('');
       html += `<div class="prop-row"><span>面積の扱い</span><select id="propAreaUse">${areaOpts}</select></div>`;
+      html += `<label class="check-row"><input type="checkbox" id="propBoundaryOnly" ${el.boundaryOnly ? 'checked' : ''}> 線だけの面積囲いとして表示</label>`;
+      if (el.boundaryOnly) {
+        const lineStyle = el.boundaryLineStyle || 'solid';
+        html += `<div class="prop-row"><span>囲い線種</span><select id="propBoundaryLineStyle">
+          <option value="solid"${lineStyle === 'solid' ? ' selected' : ''}>実線</option>
+          <option value="dotted"${lineStyle === 'dotted' ? ' selected' : ''}>点線</option>
+          <option value="dashed"${lineStyle === 'dashed' ? ' selected' : ''}>破線</option>
+        </select></div>`;
+        html += `<label class="prop-row"><span>囲い線色</span><input type="color" id="propBoundaryColor" value="${el.boundaryColor || boundaryColorForUse(G.areaUseForRegion(el))}"></label>`;
+      }
       html += `<label class="check-row"><input type="checkbox" data-fieldbool="showLabel" ${el.showLabel ? 'checked' : ''}> 区画名を図面に表示</label>`;
     } else {
       html = `<div class="prop-row"><span>種別</span><b>${kindLabel(el, kind)}</b></div>`;
@@ -1403,9 +1470,25 @@
     if (areaUseSel) {
       areaUseSel.onchange = (e) => {
         el.areaUse = e.target.value;
+        if (el.boundaryOnly && !el.boundaryColor) el.boundaryColor = boundaryColorForUse(G.areaUseForRegion(el));
         refresh(); showProps(el);
       };
     }
+    const boundaryOnly = box.querySelector('#propBoundaryOnly');
+    if (boundaryOnly) {
+      boundaryOnly.onchange = (e) => {
+        el.boundaryOnly = e.target.checked;
+        if (el.boundaryOnly) {
+          el.boundaryLineStyle = el.boundaryLineStyle || 'solid';
+          el.boundaryColor = el.boundaryColor || boundaryColorForUse(G.areaUseForRegion(el));
+        }
+        refresh(); showProps(el);
+      };
+    }
+    const boundaryStyle = box.querySelector('#propBoundaryLineStyle');
+    if (boundaryStyle) boundaryStyle.onchange = (e) => { el.boundaryLineStyle = e.target.value; refresh(); showProps(el); };
+    const boundaryColor = box.querySelector('#propBoundaryColor');
+    if (boundaryColor) boundaryColor.oninput = (e) => { el.boundaryColor = e.target.value; refresh(); };
     // 多角形の頂点座標の編集(原点の取り直しがあるため change で確定時に反映)
     box.querySelectorAll('[data-vx], [data-vy]').forEach((inp) => {
       inp.addEventListener('change', (e) => {

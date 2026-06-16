@@ -129,6 +129,14 @@
     return filterTypes.indexOf(use) >= 0;
   }
 
+  function isPremisesAreaBoundary(region) {
+    return region && region.boundaryOnly === true && areaUseForRegion(region) === 'premises';
+  }
+
+  function hasPremisesAreaBoundary(project) {
+    return (project.regions || []).some(isPremisesAreaBoundary);
+  }
+
   function regionCenter(region) {
     if (region.shape === 'polygon' && (region.points || []).length) {
       const pts = region.points || [];
@@ -164,12 +172,16 @@
     let totalCalc = 0;
     const codeMap = new Map();
     let codeNo = 0;
+    const premisesBoundaryMode = !filterTypes && hasPremisesAreaBoundary(project);
+    const includeRegion = (r) => premisesBoundaryMode
+      ? isPremisesAreaBoundary(r)
+      : isAreaVisibleInTable(r, filterTypes);
     project.regions.forEach((r) => {
-      if (!isPillarRegion(r) && areaUseForRegion(r) !== 'display') codeMap.set(r.id, code(++codeNo));
+      if (!isPillarRegion(r) && includeRegion(r)) codeMap.set(r.id, code(++codeNo));
     });
     project.regions.forEach((r) => {
       if (isPillarRegion(r)) return;
-      if (!isAreaVisibleInTable(r, filterTypes)) return;
+      if (!includeRegion(r)) return;
       const row = regionRow(r);
       row.code = codeMap.get(r.id) || '';
       rows.push(row);
@@ -422,11 +434,14 @@
 
   /* 主要な面積サマリー */
   function summary(project) {
+    const explicitPremises = hasPremisesAreaBoundary(project);
     const all = buildTable(project, null);
     const kyaku = buildTable(project, ['kyakushitsu']);
     const chubo = buildTable(project, ['chubo']);
     const toilet = buildTable(project, ['toilet']);
-    const other = buildTable(project, ['tsuro', 'soko', 'other', 'premises']);
+    const other = buildTable(project, explicitPremises
+      ? ['tsuro', 'soko', 'other']
+      : ['tsuro', 'soko', 'other', 'premises']);
     return {
       premises: all.total,   // 営業所面積(全区画合計)
       kyakushitsu: kyaku.total,
@@ -527,7 +542,7 @@
 
   global.Geometry = {
     mmToM, fmtM, code, regionCalc, regionAreaSqm, regionRow, buildTable,
-    isPillarRegion, areaUseForRegion,
+    isPillarRegion, areaUseForRegion, isPremisesAreaBoundary, hasPremisesAreaBoundary,
     pointInRegion, pillarsInRegion, pillarDeductions, regionNetAreaSqm,
     polygonCalc, polygonEdgesM, polygonPointsM,
     offsetPolygonAbs, premiseCenterlineAbs, premiseWallPolysAbs, premiseRegionLike, premiseCalc,

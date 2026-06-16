@@ -9,6 +9,7 @@
   const REGION_TYPES = {
     kyakushitsu: { label: '客室',   color: '#ffe0b2' },
     chubo:       { label: '厨房',   color: '#b2dfdb' },
+    premisesArea:{ label: '営業所囲い', color: '#1d4ed8', defaultAreaUse: 'premises' },
     counter:     { label: 'カウンター', color: '#ffd180', defaultW: 3200, defaultH: 600, defaultAreaUse: 'kyakushitsu' },
     toilet:      { label: 'トイレ', color: '#c5cae9' },
     tsuro:       { label: '通路',   color: '#f0f4c3' },

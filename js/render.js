@@ -181,25 +181,29 @@
   function drawPolygonRegion(ctx, r, opts) {
     const pts = polygonScreenPts(r);
     if (pts.length < 3) return;
+    const boundaryOnly = r.boundaryOnly === true;
+    const muted = boundaryOnly ? false : opts.muted;
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.closePath();
-    if (opts.fill) {
-      ctx.globalAlpha = opts.muted ? 0.15 : 0.55; // 強調対象外は薄く塗る
+    if (opts.fill && !boundaryOnly) {
+      ctx.globalAlpha = muted ? 0.15 : 0.55; // 強調対象外は薄く塗る
       ctx.fillStyle = r.color;
       ctx.fill();
       ctx.globalAlpha = 1;
     }
-    ctx.lineWidth = opts.selected ? 3 : 2;
-    ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : (opts.stroke || '#333'));
+    ctx.lineWidth = opts.selected ? 3 : (boundaryOnly ? Math.max(2, wpx(55)) : 2);
+    ctx.strokeStyle = opts.selected ? '#d32f2f'
+      : (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333')));
+    if (boundaryOnly) ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
     ctx.stroke();
     if (shouldDrawRegionLabel(r)) {
       // ラベルは重心に置く(既定320mm相当・全体設定・個別指定で調整可)
       const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
       const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-      ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
+      ctx.fillStyle = muted ? '#8a8f94' : '#222';
       ctx.font = `${fontPx(320, r)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -283,22 +287,26 @@
     const w = r.w * view.zoom, h = r.h * view.zoom;
     const w2 = (r.w2 != null ? r.w2 : r.w) * view.zoom;
     const pts = shapePoints(r.shape || 'rect', w, h, w2);
+    const boundaryOnly = r.boundaryOnly === true;
+    const muted = boundaryOnly ? false : opts.muted;
     ctx.save();
     ctx.translate(sc.x, sc.y);
     ctx.rotate((r.rotation || 0) * Math.PI / 180);
     tracePoly(ctx, pts);
-    if (opts.fill) {
-      ctx.globalAlpha = opts.muted ? 0.15 : 0.55; // 強調対象外は薄く塗る
+    if (opts.fill && !boundaryOnly) {
+      ctx.globalAlpha = muted ? 0.15 : 0.55; // 強調対象外は薄く塗る
       ctx.fillStyle = r.color;
       ctx.fill();
       ctx.globalAlpha = 1;
     }
-    ctx.lineWidth = opts.selected ? 3 : 2;
-    ctx.strokeStyle = opts.selected ? '#d32f2f' : (opts.muted ? '#9aa0a6' : (opts.stroke || '#333'));
+    ctx.lineWidth = opts.selected ? 3 : (boundaryOnly ? Math.max(2, wpx(55)) : 2);
+    ctx.strokeStyle = opts.selected ? '#d32f2f'
+      : (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333')));
+    if (boundaryOnly) ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
     ctx.stroke();
     if (shouldDrawRegionLabel(r)) {
       // ラベル(符号つき)。既定は実寸320mm相当(全体設定・個別指定で調整可)
-      ctx.fillStyle = opts.muted ? '#8a8f94' : '#222';
+      ctx.fillStyle = muted ? '#8a8f94' : '#222';
       ctx.font = `${fontPx(320, r)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -1574,6 +1582,7 @@
       strokeOutline(ctx, regionOutlinePoints(global.Geometry.premiseRegionLike(project.premise)), '#1d4ed8', styles.premises);
     }
     for (const r of project.regions || []) {
+      if (r.boundaryOnly === true) continue;
       if (isPillarRegion(r)) continue;
       const use = global.Geometry.areaUseForRegion(r);
       if (use === 'kyakushitsu') {
