@@ -584,7 +584,7 @@
     const dim = {
       id: nextId(project, 'd'),
       x1, y1, x2, y2,
-      layer: layer || 'plan',
+      layer: layer || 'drawings',
     };
     project.dimensions = project.dimensions || [];
     project.dimensions.push(dim);

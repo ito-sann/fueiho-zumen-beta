@@ -331,7 +331,7 @@
         R.setLayer('plan'); buildLayerTabs();
       }
       I.beginMeasure(state, (x1, y1, x2, y2) => {
-        const dim = M.addDimension(project, x1, y1, x2, y2, R.getLayer());
+        const dim = M.addDimension(project, x1, y1, x2, y2, 'drawings');
         state.selectedId = dim.id;
         refresh(); showProps(dim);
       });
@@ -1164,10 +1164,8 @@
     if (kind === 'dimensions') {
       // 寸法線: 長さ(自動)と表示する図面、両端の座標(直接入力も可)
       const lenM = G.mmToM(Math.hypot(el.x2 - el.x1, el.y2 - el.y1));
-      const lopts = Object.entries(R.LAYERS).map(([k, v]) =>
-        `<option value="${k}"${(el.layer || 'plan') === k ? ' selected' : ''}>${v.label}</option>`).join('');
       html += `<div class="prop-row"><span>長さ</span><b id="propDimLen">${lenM.toFixed(2)} m</b></div>`;
-      html += `<div class="prop-row"><span>表示する図面</span><select id="propNoteLayer">${lopts}</select></div>`;
+      html += '<div class="prop-row"><span>表示する図面</span><b>平面図・営業所求積図・客室調理場求積図</b></div>';
       html += propNum('始点X(mm)', 'x1', el.x1) + propNum('始点Y(mm)', 'y1', el.y1);
       html += propNum('終点X(mm)', 'x2', el.x2) + propNum('終点Y(mm)', 'y2', el.y2);
       html += '<p class="muted">両端の□はキャンバス上でドラッグでも動かせます。</p>';

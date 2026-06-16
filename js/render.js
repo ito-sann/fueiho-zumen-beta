@@ -1441,9 +1441,17 @@
 
   function drawManualDims(ctx, project, state) {
     for (const d of (project.dimensions || [])) {
-      if ((d.layer || 'plan') !== currentLayer) continue;
+      if (!dimVisibleOnLayer(d, currentLayer)) continue;
       drawManualDim(ctx, d, { selected: state.selectedId === d.id });
     }
+  }
+
+  function dimVisibleOnLayer(dim, layer) {
+    const l = dim.layer || 'drawings';
+    const drawingLayers = ['plan', 'premises', 'kyakushitsu'];
+    if (l === 'drawings') return drawingLayers.indexOf(layer) >= 0;
+    if (drawingLayers.indexOf(l) >= 0) return drawingLayers.indexOf(layer) >= 0; // 旧データ互換
+    return l === layer;
   }
 
   /* 寸法線の作図プレビュー(1点目を置いた後、カーソルまでの仮の線) */

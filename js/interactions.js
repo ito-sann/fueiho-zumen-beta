@@ -103,12 +103,20 @@
   }
 
   /* 手動寸法線の当たり判定(線の近くをつかめる) */
+  function dimVisibleOnLayer(dim, layer) {
+    const l = dim.layer || 'drawings';
+    const drawingLayers = ['plan', 'premises', 'kyakushitsu'];
+    if (l === 'drawings') return drawingLayers.indexOf(layer) >= 0;
+    if (drawingLayers.indexOf(l) >= 0) return drawingLayers.indexOf(layer) >= 0; // 旧データ互換
+    return l === layer;
+  }
+
   function dimAt(project, wx, wy) {
     const dims = project.dimensions || [];
     const tol = Math.max(120, 8 / global.Render.view.zoom);
     for (let i = dims.length - 1; i >= 0; i--) {
       const d = dims[i];
-      if ((d.layer || 'plan') !== global.Render.getLayer()) continue;
+      if (!dimVisibleOnLayer(d, global.Render.getLayer())) continue;
       if (distToSegment(wx, wy, d.x1, d.y1, d.x2, d.y2) <= tol) return d;
     }
     return null;
