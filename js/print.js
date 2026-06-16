@@ -225,8 +225,24 @@
     return `
 <div class="sheet">
   <img src="${img.dataURL}" alt="${escapeHtml(drawingName)}">
-  <div class="frame-scale">縮尺 1/${project.meta.scale}</div>
+  ${frameScaleBarHtml(project, layer)}
 </div>`;
+  }
+
+  function frameScaleBarHtml(project, layer) {
+    if (['plan', 'premises', 'kyakushitsu'].indexOf(layer) < 0) return '';
+    const scale = project.meta.scale || 50;
+    const mm = (worldMm) => (worldMm / scale).toFixed(2);
+    return `<svg class="frame-scale-bar" style="width:${mm(1000)}mm;height:${mm(840)}mm;right:${mm(280)}mm;bottom:${mm(200)}mm"
+      viewBox="0 0 1000 840" overflow="visible" aria-label="縮尺 1/${scale}">
+      <line x1="0" y1="420" x2="1000" y2="420"></line>
+      <line x1="0" y1="290" x2="0" y2="550"></line>
+      <line x1="1000" y1="290" x2="1000" y2="550"></line>
+      <line x1="500" y1="355" x2="500" y2="485"></line>
+      <text x="0" y="600" text-anchor="middle" dominant-baseline="hanging">0</text>
+      <text x="1000" y="600" text-anchor="middle" dominant-baseline="hanging">1m</text>
+      <text x="1000" y="240" text-anchor="end">縮尺 1/${scale}</text>
+    </svg>`;
   }
 
   /* 印刷用ウィンドウの共通ガワ */
@@ -252,11 +268,9 @@
   .sheet { width: ${page.w}mm; height: ${page.h}mm; overflow: hidden; break-after: page; page-break-after: always; position: relative; }
   .sheet:last-child { break-after: auto; page-break-after: auto; }
   .sheet img { display: block; width: 100%; height: 100%; }
-  .frame-scale {
-    position: absolute; right: 6mm; bottom: 5mm; z-index: 2;
-    background: rgba(255,255,255,0.9); border: 0.25mm solid #111;
-    padding: 1.2mm 2.4mm; font-size: 10pt; line-height: 1.2; font-weight: 700;
-  }
+  .frame-scale-bar { position: absolute; z-index: 2; overflow: visible; pointer-events: none; }
+  .frame-scale-bar line { stroke: #111; stroke-width: 20; stroke-linecap: square; }
+  .frame-scale-bar text { fill: #111; font: 700 240px -apple-system, "Hiragino Sans", sans-serif; }
   @media print { .noprint { display: none; } }
   .noprint { text-align: center; padding: 8px; }
   .noprint button { font-size: 13px; padding: 6px 16px; cursor: pointer; }
