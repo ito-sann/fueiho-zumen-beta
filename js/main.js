@@ -779,6 +779,14 @@
     $('metaNorth').checked = m.showNorthMark === true;
     $('metaFontScale').value = String(m.fontScale || 100);
     $('metaColors').value = m.colorMode || 'mono';
+    m.boundaryLineStyles = Object.assign({
+      premises: 'solid',
+      kyakushitsu: 'solid',
+      chubo: 'solid',
+    }, m.boundaryLineStyles || {});
+    $('linePremises').value = m.boundaryLineStyles.premises;
+    $('lineKyakushitsu').value = m.boundaryLineStyles.kyakushitsu;
+    $('lineChubo').value = m.boundaryLineStyles.chubo;
     $('premMethod').value = m.premisesMethod || 'regions';
     $('premWall').value = project.premise ? project.premise.wallThickness : 100;
     $('premMeasured').value = project.premise ? project.premise.measuredAt : 'inner';
@@ -798,6 +806,9 @@
     $('metaNorth').onchange = (e) => { m.showNorthMark = e.target.checked; draw(); };
     $('metaFontScale').onchange = (e) => { m.fontScale = parseInt(e.target.value, 10); draw(); };
     $('metaColors').onchange = (e) => { m.colorMode = e.target.value; draw(); };
+    $('linePremises').onchange = (e) => { m.boundaryLineStyles.premises = e.target.value; draw(); };
+    $('lineKyakushitsu').onchange = (e) => { m.boundaryLineStyles.kyakushitsu = e.target.value; draw(); };
+    $('lineChubo').onchange = (e) => { m.boundaryLineStyles.chubo = e.target.value; draw(); };
     // 営業所求積の方式(署のローカルルール)。求積表とサマリーに反映する
     $('premMethod').onchange = (e) => { m.premisesMethod = e.target.value; refresh(); };
     // 柱の面積を区画(客室・調理場など)の面積から差し引くか

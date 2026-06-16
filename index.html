@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.26.0">
+  <link rel="stylesheet" href="css/style.css?v=1.27.0">
 </head>
 <body>
   <header class="topbar">
@@ -200,6 +200,18 @@
             <option value="police">色分け(営業所=青・客室=赤・調理場=緑)</option>
           </select>
         </label>
+        <div class="size-row">
+          <label>営業所囲い線
+            <select id="linePremises"><option value="solid">実線</option><option value="dotted">点線</option><option value="dashed">破線</option><option value="hidden">非表示</option></select>
+          </label>
+          <label>客室囲い線
+            <select id="lineKyakushitsu"><option value="solid">実線</option><option value="dotted">点線</option><option value="dashed">破線</option><option value="hidden">非表示</option></select>
+          </label>
+        </div>
+        <label class="field">調理場囲い線
+          <select id="lineChubo"><option value="solid">実線</option><option value="dotted">点線</option><option value="dashed">破線</option><option value="hidden">非表示</option></select>
+        </label>
+        <p class="muted">「色分け」を選ぶと、営業所全体=青、客室=赤、調理場=緑の囲い線を図面に重ねます。県の指定に合わせて実線・点線・破線を切り替えられます。</p>
         <label class="check-row"><input type="checkbox" id="metaFrame"> 用紙枠ガイドを表示</label>
         <label class="check-row"><input type="checkbox" id="metaNorth"> 方位記号(N)を表示</label>
         <label class="check-row"><input type="checkbox" id="printTrueScale"> PDFを実寸の縮尺で印刷(定規で正確に1/縮尺)</label>
@@ -282,12 +294,12 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.26.0"></script>
-  <script src="js/geometry.js?v=1.26.0"></script>
-  <script src="js/render.js?v=1.26.0"></script>
-  <script src="js/interactions.js?v=1.26.0"></script>
-  <script src="js/print.js?v=1.26.0"></script>
-  <script src="js/forms.js?v=1.26.0"></script>
-  <script src="js/main.js?v=1.26.0"></script>
+  <script src="js/model.js?v=1.27.0"></script>
+  <script src="js/geometry.js?v=1.27.0"></script>
+  <script src="js/render.js?v=1.27.0"></script>
+  <script src="js/interactions.js?v=1.27.0"></script>
+  <script src="js/print.js?v=1.27.0"></script>
+  <script src="js/forms.js?v=1.27.0"></script>
+  <script src="js/main.js?v=1.27.0"></script>
 </body>
 </html>

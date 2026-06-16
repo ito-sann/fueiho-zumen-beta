@@ -334,6 +334,12 @@
         premisesMethod: 'regions',
         /* 求積図の線色: 'mono'=黒 / 'police'=営業所:青・客室:赤・調理場:緑(慣行色) */
         colorMode: 'mono',
+        /* 色分け囲い線の線種。colorMode='police' のときに使う。 */
+        boundaryLineStyles: {
+          premises: 'solid',
+          kyakushitsu: 'solid',
+          chubo: 'solid',
+        },
         /* 柱の面積を、柱が立っている区画(客室・調理場など)の面積から差し引くか */
         deductPillars: false,
         /* PDFを実寸の縮尺(定規で測って正確に1/縮尺)で印刷するか。

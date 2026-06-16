@@ -1044,14 +1044,19 @@
     const rl = global.Geometry.premiseRegionLike(pr);
     const pts = rl.points.map((p) => worldToScreen(rl.x + p.x, rl.y + p.y));
     const police = project.meta.colorMode === 'police';
+    const styles = boundaryLineStyles(project);
+    const premiseStyle = police ? styles.premises : 'solid';
     ctx.save();
-    ctx.strokeStyle = police ? '#1d4ed8' : '#111';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.closePath();
-    ctx.stroke();
+    if (premiseStyle !== 'hidden') {
+      ctx.strokeStyle = police ? '#1d4ed8' : '#111';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash(police ? lineDashFor(premiseStyle) : []);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
+      ctx.stroke();
+    }
     ctx.restore();
     drawPolygonDims(ctx, rl); // 辺長(m)と P1, P2 … を共通処理で付ける
     // 凡例的なラベル
@@ -1486,12 +1491,12 @@
                  furniture: true, fittings: true, fixtures: false, dims: true, table: false };
       case 'premises':
         return { regionsFill: false, allRegions: true, regionTypes: null,
-                 furniture: false, fittings: false, fixtures: false, dims: true, table: 'all' };
+                 furniture: false, counterFurniture: true, fittings: false, fixtures: false, dims: true, table: 'all' };
       case 'kyakushitsu':
         // 全区画を表示して間取りがわかるようにし、客室・調理場だけ強調(色+寸法)
         return { regionsFill: true, allRegions: true, regionTypes: null,
                  highlightTypes: ['kyakushitsu', 'chubo'],
-                 furniture: false, fittings: false, fixtures: false, dims: true, table: 'kyakuchubo' };
+                 furniture: false, counterFurniture: true, fittings: false, fixtures: false, dims: true, table: 'kyakuchubo' };
       case 'lighting':
         return { regionsFill: true, allRegions: true, regionTypes: null,
                  furniture: false, fittings: false, fixtures: true, dims: false, table: 'fixtures' };
@@ -1514,6 +1519,73 @@
       if (use === 'chubo') return '#2e7d32';
     }
     return null;
+  }
+
+  function boundaryLineStyles(project) {
+    return Object.assign({
+      premises: 'solid',
+      kyakushitsu: 'solid',
+      chubo: 'solid',
+    }, (project.meta && project.meta.boundaryLineStyles) || {});
+  }
+
+  function lineDashFor(style) {
+    if (style === 'dotted') return [wpx(80), wpx(120)];
+    if (style === 'dashed') return [wpx(360), wpx(180)];
+    return [];
+  }
+
+  function regionOutlinePoints(r) {
+    if (!r) return [];
+    if (r.shape === 'polygon') {
+      return (r.points || []).map((p) => worldToScreen(r.x + p.x, r.y + p.y));
+    }
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h / 2;
+    const rad = (r.rotation || 0) * Math.PI / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const pts = shapePoints(r.shape || 'rect', r.w, r.h, r.w2 != null ? r.w2 : r.w);
+    return pts.map(([px, py]) => worldToScreen(
+      cx + px * cos - py * sin,
+      cy + px * sin + py * cos
+    ));
+  }
+
+  function strokeOutline(ctx, pts, color, style) {
+    if (!pts || pts.length < 3 || style === 'hidden') return;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(2, wpx(55));
+    ctx.setLineDash(lineDashFor(style));
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawBoundaryLines(ctx, project) {
+    if (!project.meta || project.meta.colorMode !== 'police') return;
+    if (['plan', 'premises', 'kyakushitsu'].indexOf(currentLayer) < 0) return;
+    const styles = boundaryLineStyles(project);
+    if (currentLayer !== 'premises' && project.premise) {
+      strokeOutline(ctx, regionOutlinePoints(global.Geometry.premiseRegionLike(project.premise)), '#1d4ed8', styles.premises);
+    }
+    for (const r of project.regions || []) {
+      if (isPillarRegion(r)) continue;
+      const use = global.Geometry.areaUseForRegion(r);
+      if (use === 'kyakushitsu') {
+        strokeOutline(ctx, regionOutlinePoints(r), '#e53935', styles.kyakushitsu);
+      } else if (use === 'chubo') {
+        strokeOutline(ctx, regionOutlinePoints(r), '#2e7d32', styles.chubo);
+      }
+    }
+  }
+
+  function isCounterFurniture(f) {
+    return f && (f.kind === 'counter' || f.kind === 'counterL' || /カウンター/.test(f.label || ''));
   }
 
   function render(ctx, canvas, project, state, opts) {
@@ -1587,6 +1659,12 @@
       for (const f of project.furniture) {
         drawFurniture(ctx, f, { selected: state.selectedId === f.id, num: nums[f.id] });
       }
+    } else if (vis.counterFurniture) {
+      const nums = global.Geometry.furnitureNumberMap(project);
+      for (const f of project.furniture || []) {
+        if (!isCounterFurniture(f)) continue;
+        drawFurniture(ctx, f, { selected: state.selectedId === f.id, num: nums[f.id] });
+      }
     }
     if (vis.fixtures) {
       for (const x of project.fixtures) {
@@ -1598,6 +1676,7 @@
     if (currentLayer === 'premises' && project.premise) {
       drawPremiseCenterline(ctx, project);
     }
+    drawBoundaryLines(ctx, project);
     // 求積表(計算過程)を図面そのものに重ねる(求積図のみ・設定で切替)
     if ((currentLayer === 'premises' || currentLayer === 'kyakushitsu') &&
         project.meta.showKyusekiTable !== false) {
