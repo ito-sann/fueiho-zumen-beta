@@ -1309,8 +1309,8 @@
   const noteBoxes = {};
   function noteBox(id) { return noteBoxes[id] || { w: 1000, h: 500 }; }
 
-  /* メモを描く: 白い箱に文章(複数行可)、箱の中心から先端(tx,ty)へ引き出し線+矢印。
-   * 選択中は赤くし、矢印の先端にドラッグ用ハンドルを出す。 */
+  /* メモを描く: メモは白い箱+引き出し線、コメントは囲いなしの文字だけ。
+   * 選択中のメモは赤くし、矢印の先端にドラッグ用ハンドルを出す。 */
   function drawNote(ctx, n, opts) {
     const fpx = fontPx(240, n);
     const lines = String(n.text || '').split('\n');
@@ -1341,12 +1341,21 @@
       ctx.closePath();
       ctx.fill();
     }
-    // 文字の箱
-    ctx.strokeStyle = line;
-    ctx.lineWidth = opts.selected ? 2 : 1.5;
-    ctx.fillStyle = 'rgba(255,255,255,0.94)';
-    ctx.fillRect(p.x, p.y, bw, bh);
-    ctx.strokeRect(p.x, p.y, bw, bh);
+    // 文字の箱。コメント(自由テキスト)は通常時は囲いを出さず、
+    // 選択中だけドラッグ対象が分かるよう薄い点線を出す。
+    if (hasLeader) {
+      ctx.strokeStyle = line;
+      ctx.lineWidth = opts.selected ? 2 : 1.5;
+      ctx.fillStyle = 'rgba(255,255,255,0.94)';
+      ctx.fillRect(p.x, p.y, bw, bh);
+      ctx.strokeRect(p.x, p.y, bw, bh);
+    } else if (opts.selected) {
+      ctx.strokeStyle = 'rgba(37,99,235,0.65)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeRect(p.x, p.y, bw, bh);
+      ctx.setLineDash([]);
+    }
     // 本文
     ctx.fillStyle = '#222';
     ctx.textAlign = 'left';
