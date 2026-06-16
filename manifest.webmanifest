@@ -1,0 +1,20 @@
+{
+  "name": "深夜酒類 図面エディタ",
+  "short_name": "深夜図面",
+  "description": "深夜酒類提供飲食店営業開始届出用の平面図・求積図・照明音響図を作成する図面エディタ。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "lang": "ja",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
