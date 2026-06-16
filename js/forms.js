@@ -44,8 +44,11 @@
 
   /* 各客室の床面積を「客室1: 9.72㎡」形式で列挙する(柱控除があれば控除後の面積) */
   function kyakushitsuListText(project) {
-    return project.regions
-      .filter((r) => r.type === 'kyakushitsu')
+    const rooms = project.regions.filter((r) => r.type === 'kyakushitsu');
+    if (rooms.length === 1) {
+      return `${rooms[0].label}: ${global.Geometry.summary(project).kyakushitsu.toFixed(2)}㎡`;
+    }
+    return rooms
       .map((r) => `${r.label}: ${global.Geometry.regionNetAreaSqm(project, r).toFixed(2)}㎡`)
       .join('、');
   }

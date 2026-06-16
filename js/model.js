@@ -9,11 +9,22 @@
   const REGION_TYPES = {
     kyakushitsu: { label: '客室',   color: '#ffe0b2' },
     chubo:       { label: '厨房',   color: '#b2dfdb' },
+    counter:     { label: 'カウンター', color: '#ffd180', defaultW: 3200, defaultH: 600, defaultAreaUse: 'kyakushitsu' },
     toilet:      { label: 'トイレ', color: '#c5cae9' },
     tsuro:       { label: '通路',   color: '#f0f4c3' },
     soko:        { label: '倉庫',   color: '#d7ccc8' },
     other:       { label: 'その他', color: '#eeeeee' },
     pillar:      { label: '柱',     color: '#b0bec5', defaultW: 300, defaultH: 300 },
+  };
+
+  /* 区画の見た目とは別に、求積上どの面積へ入れるかを選べる。 */
+  const AREA_USES = {
+    auto:        { label: '種類に合わせる' },
+    kyakushitsu: { label: '客室に算入' },
+    chubo:       { label: '調理場に算入' },
+    premises:    { label: '営業所にのみ算入' },
+    other:       { label: '客室・調理場以外に算入' },
+    display:     { label: '表示のみ(面積に入れない)' },
   };
 
   /* 備品カタログ(mm)。height は見通し規制の判定に使う高さ。 */
@@ -390,6 +401,7 @@
       w2: w2 != null ? w2 : Math.round(w / 2), // 台形の上底(mm)
       rotation: 0,
       showLabel: false,
+      areaUse: t.defaultAreaUse || 'auto',
       color: t.color,
     };
     project.regions.push(region);
@@ -416,6 +428,7 @@
       points: pointsAbs.map((p) => ({ x: p.x - minX, y: p.y - minY })),
       rotation: 0,
       showLabel: false,
+      areaUse: t.defaultAreaUse || 'auto',
       color: t.color,
     };
     normalizePolygon(region);
@@ -652,7 +665,7 @@
   }
 
   global.Model = {
-    REGION_TYPES, FURNITURE_CATALOG, FITTING_CATALOG, DOOR_KINDS, FIXTURE_CATALOG, PAPER_SIZES,
+    REGION_TYPES, AREA_USES, FURNITURE_CATALOG, FITTING_CATALOG, DOOR_KINDS, FIXTURE_CATALOG, PAPER_SIZES,
     FURNITURE_STYLES, defaultStyle, furniturePreset,
     SIGHTLINE_LIMIT, CHECKLIST_ITEMS,
     todayStr, defaultProject, nextId, nextRegionNumber,

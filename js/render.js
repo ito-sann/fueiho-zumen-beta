@@ -1501,8 +1501,9 @@
   function strokeFor(r, project) {
     if (project.meta.colorMode !== 'police') return null;
     if (currentLayer === 'kyakushitsu') {
-      if (r.type === 'kyakushitsu') return '#e53935';
-      if (r.type === 'chubo') return '#2e7d32';
+      const use = global.Geometry.areaUseForRegion(r);
+      if (use === 'kyakushitsu') return '#e53935';
+      if (use === 'chubo') return '#2e7d32';
     }
     return null;
   }
@@ -1545,12 +1546,14 @@
       vis.allRegions || (vis.regionTypes && vis.regionTypes.indexOf(r.type) >= 0));
 
     // highlightTypes がある図面では、対象の区画だけ強調し、他は薄く描いて間取りを示す
-    const isMain = (r) => !vis.highlightTypes || vis.highlightTypes.indexOf(r.type) >= 0;
+    const isMain = (r) => !vis.highlightTypes || vis.highlightTypes.indexOf(global.Geometry.areaUseForRegion(r)) >= 0;
 
     const regionCodeMap = new Map();
     let regionCodeNo = 0;
     for (const r of project.regions) {
-      if (!isPillarRegion(r)) regionCodeMap.set(r.id, global.Geometry.code(++regionCodeNo));
+      if (!isPillarRegion(r) && global.Geometry.areaUseForRegion(r) !== 'display') {
+        regionCodeMap.set(r.id, global.Geometry.code(++regionCodeNo));
+      }
     }
     for (const r of regions) {
       const code = regionCodeMap.get(r.id) || ''; // 柱は求積符号を振らない

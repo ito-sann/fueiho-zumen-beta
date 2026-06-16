@@ -944,7 +944,8 @@
     return project.regions
       .filter((r) => r.shape === 'polygon' &&
         !G.isPillarRegion(r) &&
-        (!filterTypes || filterTypes.indexOf(r.type) >= 0))
+        G.areaUseForRegion(r) !== 'display' &&
+        (!filterTypes || filterTypes.indexOf(G.areaUseForRegion(r)) >= 0))
       .map(coordTableHtml).join('');
   }
 
@@ -1131,6 +1132,9 @@
       const opts = Object.entries(M.REGION_TYPES).map(([k, v]) =>
         `<option value="${k}"${el.type === k ? ' selected' : ''}>${v.label}</option>`).join('');
       html = `<div class="prop-row"><span>種別</span><select id="propType">${opts}</select></div>`;
+      const areaOpts = Object.entries(M.AREA_USES).map(([k, v]) =>
+        `<option value="${k}"${(el.areaUse || 'auto') === k ? ' selected' : ''}>${v.label}</option>`).join('');
+      html += `<div class="prop-row"><span>面積の扱い</span><select id="propAreaUse">${areaOpts}</select></div>`;
       html += `<label class="check-row"><input type="checkbox" data-fieldbool="showLabel" ${el.showLabel ? 'checked' : ''}> 区画名を図面に表示</label>`;
     } else {
       html = `<div class="prop-row"><span>種別</span><b>${kindLabel(el, kind)}</b></div>`;
@@ -1381,7 +1385,15 @@
         el.color = M.REGION_TYPES[t].color;
         el.number = M.nextRegionNumber(project, t);
         el.label = t === 'kyakushitsu' ? `客室${el.number}` : M.REGION_TYPES[t].label;
+        el.areaUse = M.REGION_TYPES[t].defaultAreaUse || 'auto';
         ensureRegionVisible(t);
+        refresh(); showProps(el);
+      };
+    }
+    const areaUseSel = box.querySelector('#propAreaUse');
+    if (areaUseSel) {
+      areaUseSel.onchange = (e) => {
+        el.areaUse = e.target.value;
         refresh(); showProps(el);
       };
     }

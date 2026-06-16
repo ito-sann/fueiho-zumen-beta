@@ -107,6 +107,28 @@
     return region && region.type === 'pillar';
   }
 
+  function areaUseForRegion(region) {
+    if (!region) return 'display';
+    if (isPillarRegion(region)) return 'display';
+    const use = region.areaUse || 'auto';
+    if (use && use !== 'auto') return use;
+    const t = global.Model.REGION_TYPES[region.type] || {};
+    if (t.defaultAreaUse) return t.defaultAreaUse;
+    if (region.type === 'kyakushitsu' || region.type === 'chubo' ||
+        region.type === 'toilet' || region.type === 'tsuro' ||
+        region.type === 'soko' || region.type === 'other') {
+      return region.type;
+    }
+    return 'other';
+  }
+
+  function isAreaVisibleInTable(region, filterTypes) {
+    const use = areaUseForRegion(region);
+    if (use === 'display') return false;
+    if (!filterTypes) return true;
+    return filterTypes.indexOf(use) >= 0;
+  }
+
   function regionCenter(region) {
     if (region.shape === 'polygon' && (region.points || []).length) {
       const pts = region.points || [];
@@ -143,11 +165,11 @@
     const codeMap = new Map();
     let codeNo = 0;
     project.regions.forEach((r) => {
-      if (!isPillarRegion(r)) codeMap.set(r.id, code(++codeNo));
+      if (!isPillarRegion(r) && areaUseForRegion(r) !== 'display') codeMap.set(r.id, code(++codeNo));
     });
     project.regions.forEach((r) => {
       if (isPillarRegion(r)) return;
-      if (filterTypes && filterTypes.indexOf(r.type) < 0) return;
+      if (!isAreaVisibleInTable(r, filterTypes)) return;
       const row = regionRow(r);
       row.code = codeMap.get(r.id) || '';
       rows.push(row);
@@ -404,7 +426,7 @@
     const kyaku = buildTable(project, ['kyakushitsu']);
     const chubo = buildTable(project, ['chubo']);
     const toilet = buildTable(project, ['toilet']);
-    const other = buildTable(project, ['tsuro', 'soko', 'other']);
+    const other = buildTable(project, ['tsuro', 'soko', 'other', 'premises']);
     return {
       premises: all.total,   // 営業所面積(全区画合計)
       kyakushitsu: kyaku.total,
@@ -505,7 +527,7 @@
 
   global.Geometry = {
     mmToM, fmtM, code, regionCalc, regionAreaSqm, regionRow, buildTable,
-    isPillarRegion,
+    isPillarRegion, areaUseForRegion,
     pointInRegion, pillarsInRegion, pillarDeductions, regionNetAreaSqm,
     polygonCalc, polygonEdgesM, polygonPointsM,
     offsetPolygonAbs, premiseCenterlineAbs, premiseWallPolysAbs, premiseRegionLike, premiseCalc,
