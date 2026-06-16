@@ -1008,11 +1008,15 @@
   /* 指定の種類に含まれる多角形すべての座標求積表 */
   function coordTablesHtml(filterTypes) {
     const premiseBoundaryMode = !filterTypes && G.hasPremisesAreaBoundary(project);
+    const anyBoundaryMode = !filterTypes && !premiseBoundaryMode && G.hasAnyAreaBoundary(project);
+    const filteredBoundaryMode = !!filterTypes && G.hasAnyAreaBoundary(project);
     return project.regions
       .filter((r) => r.shape === 'polygon' &&
         !G.isPillarRegion(r) &&
         G.areaUseForRegion(r) !== 'display' &&
         (!premiseBoundaryMode || G.isPremisesAreaBoundary(r)) &&
+        (!anyBoundaryMode || r.boundaryOnly === true) &&
+        (!filteredBoundaryMode || r.boundaryOnly === true) &&
         (!filterTypes || filterTypes.indexOf(G.areaUseForRegion(r)) >= 0))
       .map(coordTableHtml).join('');
   }
@@ -1223,6 +1227,11 @@
         <textarea data-field="text" rows="3">${esc(el.text || '')}</textarea></label>`;
     } else if (kind !== 'dimensions') {
       html += propText('ラベル', 'label', el.label);
+    }
+    if (kind === 'regions') {
+      const autoExpr = G.regionCalc(el).expr;
+      html += propText('求積表の計算式', 'calcExpr', el.calcExpr || '');
+      html += `<p class="muted">空欄なら自動: ${esc(autoExpr)}。面積の数値は図形から自動計算されます。</p>`;
     }
     // ラベルを持つ要素は文字サイズを個別に調整できる。
     // Googleドキュメント風のサイズ番号(15=標準)で、−/＋は段階リストを移動する。

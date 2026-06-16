@@ -137,6 +137,11 @@
     return (project.regions || []).some(isPremisesAreaBoundary);
   }
 
+  function hasAnyAreaBoundary(project) {
+    return (project.regions || []).some((r) =>
+      r && r.boundaryOnly === true && areaUseForRegion(r) !== 'display');
+  }
+
   function regionCenter(region) {
     if (region.shape === 'polygon' && (region.points || []).length) {
       const pts = region.points || [];
@@ -151,13 +156,14 @@
   /* 1区画 → 求積表の1行 */
   function regionRow(region) {
     const c = regionCalc(region);
+    const expr = (region.calcExpr || '').trim() || c.expr;
     return {
       id: region.id,
       label: region.label,
       type: region.type,
       w: c.wM.toFixed(2), h: c.hM.toFixed(2),
-      expr: c.expr,
-      formula: `${c.expr} = ${c.area4.toFixed(4)}`,
+      expr,
+      formula: `${expr} = ${c.area4.toFixed(4)}`,
       area: c.area4,        // 部屋の面積(第4位)
     };
   }
@@ -173,8 +179,14 @@
     const codeMap = new Map();
     let codeNo = 0;
     const premisesBoundaryMode = !filterTypes && hasPremisesAreaBoundary(project);
+    const anyBoundaryMode = !filterTypes && !premisesBoundaryMode && hasAnyAreaBoundary(project);
+    const filteredBoundaryMode = !!filterTypes && hasAnyAreaBoundary(project);
     const includeRegion = (r) => premisesBoundaryMode
       ? isPremisesAreaBoundary(r)
+      : anyBoundaryMode
+        ? r.boundaryOnly === true && areaUseForRegion(r) !== 'display'
+      : filteredBoundaryMode
+        ? r.boundaryOnly === true && filterTypes.indexOf(areaUseForRegion(r)) >= 0
       : isAreaVisibleInTable(r, filterTypes);
     project.regions.forEach((r) => {
       if (!isPillarRegion(r) && includeRegion(r)) codeMap.set(r.id, code(++codeNo));
@@ -542,7 +554,7 @@
 
   global.Geometry = {
     mmToM, fmtM, code, regionCalc, regionAreaSqm, regionRow, buildTable,
-    isPillarRegion, areaUseForRegion, isPremisesAreaBoundary, hasPremisesAreaBoundary,
+    isPillarRegion, areaUseForRegion, isPremisesAreaBoundary, hasPremisesAreaBoundary, hasAnyAreaBoundary,
     pointInRegion, pillarsInRegion, pillarDeductions, regionNetAreaSqm,
     polygonCalc, polygonEdgesM, polygonPointsM,
     offsetPolygonAbs, premiseCenterlineAbs, premiseWallPolysAbs, premiseRegionLike, premiseCalc,
