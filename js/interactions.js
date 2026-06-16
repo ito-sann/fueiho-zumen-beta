@@ -131,42 +131,57 @@
     return kind === filter;
   }
 
+  function isCounterFurniture(f) {
+    return f && (f.kind === 'counter' || f.kind === 'counterL' || /カウンター/.test(f.label || ''));
+  }
+
+  function visibleForHit(project, kind, el) {
+    const layer = global.Render.getLayer();
+    const vis = global.Render.visibility(layer);
+    if (kind === 'regions') {
+      if (layer === 'lighting' && el.boundaryOnly === true) return false;
+      return vis.allRegions || (vis.regionTypes && vis.regionTypes.indexOf(el.type) >= 0);
+    }
+    if (kind === 'fittings') return !!vis.fittings;
+    if (kind === 'furniture') return !!vis.furniture || (!!vis.counterFurniture && isCounterFurniture(el));
+    if (kind === 'fixtures') return !!vis.fixtures;
+    if (kind === 'dimensions') return dimVisibleOnLayer(el, layer);
+    if (kind === 'notes') return (el.layer || 'plan') === layer;
+    return true;
+  }
+
+  function hitOrderable(project, wx, wy, filter) {
+    const items = global.Model.sortedOrderableItems(project).slice().reverse();
+    for (const item of items) {
+      const el = item.element;
+      if (!matchesSelectionFilter(el, item.kind, filter)) continue;
+      if (!visibleForHit(project, item.kind, el)) continue;
+      if (item.kind === 'notes') {
+        const b = global.Render.noteBox(el.id);
+        if (wx >= el.x && wx <= el.x + b.w && wy >= el.y && wy <= el.y + b.h) return el;
+      } else if (item.kind === 'dimensions') {
+        const tol = Math.max(120, 8 / global.Render.view.zoom);
+        if (distToSegment(wx, wy, el.x1, el.y1, el.x2, el.y2) <= tol) return el;
+      } else if (item.kind === 'fixtures') {
+        const r = Math.max(280, 12 / global.Render.view.zoom);
+        if (Math.hypot(wx - el.x, wy - el.y) <= r) return el;
+      } else if (item.kind === 'fittings') {
+        if (inRotatedRect(wx, wy, el)) return el;
+      } else if (item.kind === 'furniture') {
+        const hit = el.shape === 'polygon' ? inPolygon(wx, wy, el) : inRotatedRect(wx, wy, el);
+        if (hit) return el;
+      } else if (item.kind === 'regions') {
+        const hit = el.shape === 'polygon' ? inPolygon(wx, wy, el) : inRotatedRect(wx, wy, el);
+        if (hit) return el;
+      }
+    }
+    return null;
+  }
+
   function hitTest(project, wx, wy, filter) {
     filter = filter || 'all';
-    // 最前面のメモを最優先
-    const note = matchesSelectionFilter(null, 'notes', filter) ? noteAt(project, wx, wy) : null;
-    if (note) return note;
-    // 手動寸法線(線の近く)
-    const dim = matchesSelectionFilter(null, 'dimensions', filter) ? dimAt(project, wx, wy) : null;
-    if (dim) return dim;
-    // 上に描かれるもの(設備→備品→区画)を優先
-    if (matchesSelectionFilter(null, 'fixtures', filter)) {
-      for (let i = project.fixtures.length - 1; i >= 0; i--) {
-        const x = project.fixtures[i];
-        // アイコン実寸(半径220mm)+余裕。縮小表示中でも最低12px分はつかめるようにする
-        const r = Math.max(280, 12 / global.Render.view.zoom);
-        if (Math.hypot(wx - x.x, wy - x.y) <= r) return x;
-      }
-    }
-    if (matchesSelectionFilter(null, 'fittings', filter)) {
-      const fittings = project.fittings || [];
-      for (let i = fittings.length - 1; i >= 0; i--) {
-        if (inRotatedRect(wx, wy, fittings[i])) return fittings[i];
-      }
-    }
-    if (matchesSelectionFilter(null, 'furniture', filter)) {
-      for (let i = project.furniture.length - 1; i >= 0; i--) {
-        const f = project.furniture[i];
-        const hit = f.shape === 'polygon' ? inPolygon(wx, wy, f) : inRotatedRect(wx, wy, f);
-        if (hit) return f;
-      }
-    }
-    for (let i = project.regions.length - 1; i >= 0; i--) {
-      const r = project.regions[i];
-      if (!matchesSelectionFilter(r, 'regions', filter)) continue;
-      const hit = r.shape === 'polygon' ? inPolygon(wx, wy, r) : inRotatedRect(wx, wy, r);
-      if (hit) return r;
-    }
+    const hit = hitOrderable(project, wx, wy, filter);
+    if (hit) return hit;
     // 営業所外周は一番下(輪郭線の近くだけ)
     if (matchesSelectionFilter(project.premise, 'premise', filter) && nearPremiseEdge(project, wx, wy)) return project.premise;
     return null;

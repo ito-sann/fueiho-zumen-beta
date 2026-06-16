@@ -610,6 +610,16 @@
     return false;
   }
 
+  const Z_KIND_BASE = {
+    regions: 1000,
+    fittings: 2000,
+    furniture: 3000,
+    fixtures: 4000,
+    dimensions: 5000,
+    notes: 6000,
+  };
+  const Z_KIND_ORDER = ['regions', 'fittings', 'furniture', 'fixtures', 'dimensions', 'notes'];
+
   function findById(project, id) {
     if (project.premise && project.premise.id === id) {
       return { element: project.premise, kind: 'premise' };
@@ -619,6 +629,58 @@
       if (e) return { element: e, kind: key };
     }
     return null;
+  }
+
+  function elementZ(project, kind, el) {
+    if (!el) return -Infinity;
+    if (Number.isFinite(el.zIndex)) return el.zIndex;
+    const base = Z_KIND_BASE[kind] || 0;
+    const arr = project[kind] || [];
+    const i = arr.findIndex((e) => e.id === el.id);
+    return base + (i >= 0 ? i : 0);
+  }
+
+  function sortedOrderableItems(project) {
+    const items = [];
+    for (const kind of Z_KIND_ORDER) {
+      for (const el of (project[kind] || [])) {
+        items.push({ kind, element: el, z: elementZ(project, kind, el) });
+      }
+    }
+    return items.sort((a, b) => {
+      if (a.z !== b.z) return a.z - b.z;
+      return Z_KIND_ORDER.indexOf(a.kind) - Z_KIND_ORDER.indexOf(b.kind);
+    });
+  }
+
+  function zOrderPosition(project, id) {
+    const items = sortedOrderableItems(project);
+    const index = items.findIndex((item) => item.element.id === id);
+    return { index, count: items.length };
+  }
+
+  function setZOrder(project, id, action) {
+    const found = findById(project, id);
+    if (!found || Z_KIND_ORDER.indexOf(found.kind) < 0) return false;
+    const items = sortedOrderableItems(project);
+    const index = items.findIndex((item) => item.element.id === id);
+    if (index < 0) return false;
+    const [item] = items.splice(index, 1);
+    if (action === 'front') {
+      items.push(item);
+    } else if (action === 'back') {
+      items.unshift(item);
+    } else if (action === 'forward') {
+      items.splice(Math.min(index + 1, items.length), 0, item);
+    } else if (action === 'backward') {
+      items.splice(Math.max(index - 1, 0), 0, item);
+    } else {
+      return false;
+    }
+    items.forEach((entry, i) => {
+      entry.element.zIndex = (i + 1) * 1000;
+    });
+    return true;
   }
 
   /* 選択中の要素を複製する(営業所外周は1つだけなので対象外)。
@@ -690,7 +752,7 @@
     todayStr, defaultProject, nextId, nextRegionNumber,
     addRegion, addPolygonRegion, normalizePolygon, setPremise,
     addFurniture, addPolygonFurniture, addFitting, addFixture, addNote, addDimension,
-    removeById, findById, duplicateElement,
+    removeById, findById, elementZ, sortedOrderableItems, zOrderPosition, setZOrder, duplicateElement,
     serialize, deserialize,
   };
 })(window);

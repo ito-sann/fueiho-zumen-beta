@@ -1648,43 +1648,39 @@
         regionCodeMap.set(r.id, global.Geometry.code(++regionCodeNo));
       }
     }
-    for (const r of regions) {
-      const code = regionCodeMap.get(r.id) || ''; // 柱は求積符号を振らない
-      drawRegion(ctx, r, {
-        fill: vis.regionsFill,
-        muted: !isMain(r),
-        selected: state.selectedId === r.id,
-        stroke: strokeFor(r, project),
-        code,
-      });
-    }
-    if (vis.dims) {
-      // 客室・調理場求積図では、通路・トイレ・柱などの長さも確認できるよう全区画に寸法を付ける
-      for (const r of regions) { if (vis.dimsAllRegions || isMain(r)) drawDimension(ctx, r); }
-    }
-    if (vis.fittings && project.fittings) {
-      for (const g of project.fittings) {
-        drawFitting(ctx, g, { selected: state.selectedId === g.id });
+    const visibleRegionIds = new Set(regions.map((r) => r.id));
+    const furnitureNums = global.Geometry.furnitureNumberMap(project);
+    for (const item of global.Model.sortedOrderableItems(project)) {
+      const el = item.element;
+      if (item.kind === 'regions') {
+        if (!visibleRegionIds.has(el.id)) continue;
+        const code = regionCodeMap.get(el.id) || ''; // 柱は求積符号を振らない
+        drawRegion(ctx, el, {
+          fill: vis.regionsFill,
+          muted: !isMain(el),
+          selected: state.selectedId === el.id,
+          stroke: strokeFor(el, project),
+          code,
+        });
+        if (vis.dims && (vis.dimsAllRegions || isMain(el))) {
+          // 客室・調理場求積図では、通路・トイレ・柱などの長さも確認できるよう全区画に寸法を付ける
+          drawDimension(ctx, el);
+        }
+      } else if (item.kind === 'fittings') {
+        if (vis.fittings) drawFitting(ctx, el, { selected: state.selectedId === el.id });
+      } else if (item.kind === 'furniture') {
+        if (vis.furniture || (vis.counterFurniture && isCounterFurniture(el))) {
+          drawFurniture(ctx, el, { selected: state.selectedId === el.id, num: furnitureNums[el.id] });
+        }
+      } else if (item.kind === 'fixtures') {
+        if (vis.fixtures) drawFixture(ctx, el, { selected: state.selectedId === el.id });
+      } else if (item.kind === 'dimensions') {
+        if (dimVisibleOnLayer(el, currentLayer)) drawManualDim(ctx, el, { selected: state.selectedId === el.id });
+      } else if (item.kind === 'notes') {
+        if ((el.layer || 'plan') === currentLayer) drawNote(ctx, el, { selected: state.selectedId === el.id });
       }
     }
-    if (vis.furniture) {
-      const nums = global.Geometry.furnitureNumberMap(project);
-      for (const f of project.furniture) {
-        drawFurniture(ctx, f, { selected: state.selectedId === f.id, num: nums[f.id] });
-      }
-    } else if (vis.counterFurniture) {
-      const nums = global.Geometry.furnitureNumberMap(project);
-      for (const f of project.furniture || []) {
-        if (!isCounterFurniture(f)) continue;
-        drawFurniture(ctx, f, { selected: state.selectedId === f.id, num: nums[f.id] });
-      }
-    }
-    if (vis.fixtures) {
-      for (const x of project.fixtures) {
-        drawFixture(ctx, x, { selected: state.selectedId === x.id });
-      }
-      drawFixtureLegend(ctx, canvas, project);
-    }
+    if (vis.fixtures) drawFixtureLegend(ctx, canvas, project);
     // 営業所求積図では壁芯線(求積の根拠になる線)を最前面側に描く
     if (currentLayer === 'premises' && project.premise) {
       drawPremiseCenterline(ctx, project);
@@ -1695,9 +1691,7 @@
         project.meta.showKyusekiTable !== false) {
       drawKyusekiTable(ctx, canvas, project);
     }
-    // 手動の寸法線・メモ(この図面に属するもの)は要素の上に描く
-    drawManualDims(ctx, project, state);
-    drawNotes(ctx, project, state);
+    // 手動の寸法線・メモは上の重なり順に含めて描く
     // 寸法線の作図中プレビュー
     if (state.measure) drawMeasureDraft(ctx, state.measure);
     // 多角形の作図中なら下書きを最前面に描く

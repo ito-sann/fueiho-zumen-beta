@@ -160,6 +160,14 @@
     showProps(copy);
   }
 
+  function changeZOrder(action) {
+    if (!state.selectedId) return;
+    if (!M.setZOrder(project, state.selectedId, action)) return;
+    const found = M.findById(project, state.selectedId);
+    refresh();
+    showProps(found ? found.element : null);
+  }
+
   /* 図面オブジェクトを差し替えて画面全体を作り直す(読み込み・案件切替・元に戻す共通) */
   function adoptProject(p, opts) {
     project = p;
@@ -1462,6 +1470,13 @@
       // 営業所外周は1つだけなので複製はなし
       html += `<button class="btn small danger" id="btnDel">この要素を削除</button>`;
     } else {
+      html += `<div class="prop-row z-order-row"><span>重なり順</span>
+        <div class="z-order-controls">
+          <button type="button" class="btn small" id="btnZBack" title="最背面へ">最背面</button>
+          <button type="button" class="btn small" id="btnZBackward" title="1つ背面へ">背面</button>
+          <button type="button" class="btn small" id="btnZForward" title="1つ前面へ">前面</button>
+          <button type="button" class="btn small" id="btnZFront" title="最前面へ">最前面</button>
+        </div></div>`;
       html += `<div class="add-row">
         <button class="btn small" id="btnDup" title="複製 (Cmd/Ctrl+D)">複製</button>
         <button class="btn small danger" id="btnDel">この要素を削除</button></div>`;
@@ -1610,6 +1625,16 @@
     }
     const dupBtn = box.querySelector('#btnDup');
     if (dupBtn) dupBtn.onclick = duplicateSelected;
+    const zButtons = [
+      ['btnZBack', 'back'],
+      ['btnZBackward', 'backward'],
+      ['btnZForward', 'forward'],
+      ['btnZFront', 'front'],
+    ];
+    zButtons.forEach(([id, action]) => {
+      const btn = box.querySelector('#' + id);
+      if (btn) btn.onclick = () => changeZOrder(action);
+    });
     $('btnDel').onclick = () => {
       M.removeById(project, el.id);
       state.selectedId = null;
@@ -1626,6 +1651,7 @@
     if (kind === 'premise') return '営業所外周(壁芯)';
     if (kind === 'furniture') return '備品';
     if (kind === 'fittings') return '建具・設備';
+    if (kind === 'fixtures') return '照明・音響設備';
     if (kind === 'notes') return el.leader === false ? 'コメント(自由テキスト)' : 'メモ・引き出し線';
     if (kind === 'dimensions') return '寸法線';
     return '照明・音響';

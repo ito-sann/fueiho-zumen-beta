@@ -114,6 +114,19 @@ table.summary td { text-align: right; font-weight: 700; padding: 4px 2px; }
 .props .vertex-row { gap: 4px; }
 .props .vertex-row span { flex: 0 0 28px; }
 .props .vertex-row input { width: 50%; min-width: 0; }
+.props .z-order-row { align-items: flex-start; }
+.z-order-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  flex: 1;
+}
+.props .z-order-controls .btn {
+  width: 100%;
+  margin-top: 0;
+  padding-left: 6px;
+  padding-right: 6px;
+}
 
 .element-list { display: flex; flex-direction: column; gap: 4px; }
 .element-group-title {
