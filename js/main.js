@@ -1091,6 +1091,37 @@
   function showProps(el) {
     const box = $('props');
     if (!el) { box.innerHTML = '<p class="muted">要素を選ぶと編集できます。</p>'; return; }
+    if (el.kind === 'sheetTable' || (el.id || '').indexOf('sheet-table:') === 0) {
+      const layer = el.layer || String(el.id).replace('sheet-table:', '');
+      const layouts = project.meta.sheetTableLayouts || {};
+      const cur = layouts[layer] || {};
+      const x = Number.isFinite(cur.x) ? cur.x : el.x;
+      const y = Number.isFinite(cur.y) ? cur.y : el.y;
+      const scale = cur.scale || el.scale || 1;
+      box.innerHTML = `<div class="prop-row"><span>種別</span><b>${esc(el.label || '図面上の表')}</b></div>
+        <label class="prop-row"><span>X位置(mm)</span><input type="number" step="10" id="sheetTableX" value="${Math.round(x || 0)}"></label>
+        <label class="prop-row"><span>Y位置(mm)</span><input type="number" step="10" id="sheetTableY" value="${Math.round(y || 0)}"></label>
+        <label class="prop-row"><span>サイズ(%)</span><input type="number" step="5" min="45" max="240" id="sheetTableScale" value="${Math.round(scale * 100)}"></label>
+        <p class="muted">表の中をドラッグで移動、右下の青い四角をドラッグでサイズ変更できます。</p>
+        <button class="btn small" id="sheetTableReset">右下の自動位置に戻す</button>`;
+      const apply = () => {
+        const nx = parseFloat($('sheetTableX').value) || 0;
+        const ny = parseFloat($('sheetTableY').value) || 0;
+        const ns = (parseFloat($('sheetTableScale').value) || 100) / 100;
+        R.setSheetTableLayout(project, layer, { x: nx, y: ny, scale: ns });
+        draw();
+      };
+      ['sheetTableX', 'sheetTableY', 'sheetTableScale'].forEach((id) => {
+        $(id).addEventListener('change', apply);
+      });
+      $('sheetTableReset').onclick = () => {
+        if (project.meta.sheetTableLayouts) delete project.meta.sheetTableLayouts[layer];
+        state.selectedId = null;
+        draw();
+        showProps(null);
+      };
+      return;
+    }
     const found = M.findById(project, el.id);
     if (!found) { box.innerHTML = '<p class="muted">—</p>'; return; }
     const kind = found.kind;

@@ -17,6 +17,9 @@
     furnviews: { label: '備品姿図' },
   };
   let currentLayer = 'plan';
+  let currentSelectedId = null;
+  let sheetTableBoxes = new Map();
+  const SHEET_TABLE_PREFIX = 'sheet-table:';
 
   function setLayer(name) { if (LAYERS[name]) currentLayer = name; }
   function getLayer() { return currentLayer; }
@@ -586,7 +589,7 @@
       align: ['center', 'left', 'right', 'right'],
       rows: list.map((g) => [g.symbol, g.label, String(g.count), g.watt ? g.watt : '—']),
     } : null;
-    drawCornerTables(ctx, canvas, project, table ? [table] : [], note ? note.split('\n') : []);
+    drawCornerTables(ctx, canvas, project, table ? [table] : [], note ? note.split('\n') : [], 'lighting');
   }
 
   /* 図面そのものに重ねる求積表のデータを組み立てる。
@@ -693,13 +696,60 @@
     if (t.foot) drawRow(t.foot, ry, true);
   }
 
+  function sheetTableId(layer) {
+    return SHEET_TABLE_PREFIX + layer;
+  }
+
+  function sheetTableLabel(layer) {
+    return {
+      premises: '営業所求積図の表',
+      kyakushitsu: '客室・調理場求積図の表',
+      lighting: '照明・音響設備一覧表',
+    }[layer] || '図面上の表';
+  }
+
+  function clampTableScale(v) {
+    return Math.max(0.45, Math.min(2.4, parseFloat(v) || 1));
+  }
+
+  function sheetTableAt(project, sx, sy) {
+    for (const box of Array.from(sheetTableBoxes.values()).reverse()) {
+      if (sx >= box.x && sx <= box.x + box.w && sy >= box.y && sy <= box.y + box.h) {
+        const layout = ((project.meta && project.meta.sheetTableLayouts) || {})[box.layer] || {};
+        return {
+          id: box.id,
+          kind: 'sheetTable',
+          layer: box.layer,
+          label: sheetTableLabel(box.layer),
+          x: box.worldX,
+          y: box.worldY,
+          scale: layout.scale || 1,
+          _box: box,
+          _resize: sx >= box.handle.x && sx <= box.handle.x + box.handle.size &&
+                   sy >= box.handle.y && sy <= box.handle.y + box.handle.size,
+        };
+      }
+    }
+    return null;
+  }
+
+  function setSheetTableLayout(project, layer, patch) {
+    project.meta.sheetTableLayouts = project.meta.sheetTableLayouts || {};
+    const cur = project.meta.sheetTableLayouts[layer] || {};
+    const next = Object.assign({}, cur, patch);
+    if (next.scale != null) next.scale = clampTableScale(next.scale);
+    project.meta.sheetTableLayouts[layer] = next;
+    return next;
+  }
+
   /* 表(と任意のコメント行)を、図面の右下に白枠で重ねて描く共通処理。
    * 用紙枠(無ければ画面)に収まるよう、はみ出す場合は全体を自動縮小する。
    * 求積表(計算過程)と照明・音響設備一覧表で共用する。 */
-  function drawCornerTables(ctx, canvas, project, tables, noteLines) {
+  function drawCornerTables(ctx, canvas, project, tables, noteLines, layoutKey) {
     tables = tables || [];
     noteLines = noteLines || [];
     if (!tables.length && !noteLines.length) return;
+    layoutKey = layoutKey || currentLayer;
 
     // 基準サイズ(実寸mm→px)。収まらなければ係数 s を掛けて縮める。
     const base = {
@@ -746,11 +796,27 @@
       avX = 0; avY = 0; avW = canvas.width; avH = canvas.height;
     }
     const margin = wpx(250);
-    const s = Math.min(1, (avW - margin * 2) / W, (avH - margin * 2) / H);
+    const fitScale = Math.min(1, (avW - margin * 2) / W, (avH - margin * 2) / H);
+    const saved = ((project.meta && project.meta.sheetTableLayouts) || {})[layoutKey] || {};
+    const userScale = clampTableScale(saved.scale == null ? 1 : saved.scale);
+    const s = fitScale * userScale;
 
     const w = W * s, h = H * s;
-    const x0 = avX + avW - margin - w;
-    const y0 = avY + avH - margin - h;
+    const defaultX0 = avX + avW - margin - w;
+    const defaultY0 = avY + avH - margin - h;
+    const savedHasPos = Number.isFinite(saved.x) && Number.isFinite(saved.y);
+    const savedPt = savedHasPos ? worldToScreen(saved.x, saved.y) : null;
+    const x0 = savedPt ? savedPt.x : defaultX0;
+    const y0 = savedPt ? savedPt.y : defaultY0;
+    const worldPt = screenToWorld(x0, y0);
+    const id = sheetTableId(layoutKey);
+    const handleSize = Math.max(10, Math.min(18, wpx(260)));
+    sheetTableBoxes.set(id, {
+      id, layer: layoutKey, x: x0, y: y0, w, h,
+      worldX: worldPt.x, worldY: worldPt.y,
+      fitScale, userScale,
+      handle: { x: x0 + w - handleSize, y: y0 + h - handleSize, size: handleSize },
+    });
 
     // 背景の白枠
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
@@ -774,12 +840,24 @@
       ctx.textBaseline = 'top';
       for (const ln of noteLines) { ctx.fillText(ln, x, ty); ty += base.rowH * s; }
     }
+    if (currentSelectedId === id) {
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7, 4]);
+      ctx.strokeRect(x0 - 3, y0 - 3, w + 6, h + 6);
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#2563eb';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(x0 + w - handleSize, y0 + h - handleSize, handleSize, handleSize);
+      ctx.strokeRect(x0 + w - handleSize, y0 + h - handleSize, handleSize, handleSize);
+    }
     ctx.restore();
   }
 
   /* 求積表(計算過程)を図面そのものに白枠で重ねて描く(求積図のみ)。 */
   function drawKyusekiTable(ctx, canvas, project) {
-    drawCornerTables(ctx, canvas, project, kyusekiSheetTables(project, currentLayer), null);
+    drawCornerTables(ctx, canvas, project, kyusekiSheetTables(project, currentLayer), null, currentLayer);
   }
 
   /* 用紙枠(用紙サイズ×縮尺がカバーする実寸範囲)をワールド座標で返す。
@@ -1422,6 +1500,8 @@
   function render(ctx, canvas, project, state, opts) {
     const vis = visibility(currentLayer);
     fontScale = (project.meta.fontScale || 100) / 100; // 全体の文字サイズ設定を反映
+    currentSelectedId = opts && opts.print ? null : (state && state.selectedId);
+    sheetTableBoxes = new Map();
     clear(ctx, canvas);
     drawGrid(ctx, canvas);
     if (project.meta.showPaperFrame && !(opts && opts.hidePaperFrame)) {
@@ -1520,5 +1600,6 @@
     view, LAYERS, setLayer, getLayer, visibility,
     worldToScreen, screenToWorld, fitToView, render,
     paperFrameWorld, getNorthMark, setRedrawCallback, noteBox, furnViewLayout, furnCardAt,
+    sheetTableAt, setSheetTableLayout,
   };
 })(window);

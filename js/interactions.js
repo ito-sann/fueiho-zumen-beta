@@ -152,13 +152,14 @@
     // 外さないとイベントが二重に処理され、頂点の重複追加や矢印キーの2倍移動が起きる。
     if (canvas._detachInteractions) canvas._detachInteractions();
 
-    let mode = null; // 'drag' | 'pan' | 'vertex' | 'north' | 'notetip' | 'underlay' | 'dimpt'
+    let mode = null; // 'drag' | 'pan' | 'vertex' | 'north' | 'notetip' | 'underlay' | 'dimpt' | 'sheetTable' | 'sheetResize'
     let last = null; // 直前のマウス位置(画面px)
     let dragTarget = null;
     let grabOffset = { x: 0, y: 0 }; // 要素原点とカーソルの差(mm)
     let vertexIndex = -1; // 頂点ドラッグ中の頂点番号
     let dimSpan = { dx: 0, dy: 0 };  // 寸法線を動かすときの2点間ベクトル
     let dimEnd = 1;                  // 寸法線の端点ドラッグ中の端(1 or 2)
+    let sheetResize = null;
 
     function pos(e) {
       const rect = canvas.getBoundingClientRect();
@@ -310,6 +311,35 @@
         return;
       }
 
+      // 図面上の表(求積表・設備一覧表)は、表の中をドラッグで移動、
+      // 右下ハンドルをドラッグでサイズ変更できる。
+      const sheetTable = global.Render.sheetTableAt(project, p.x, p.y);
+      if (sheetTable) {
+        const box = sheetTable._box;
+        global.Render.setSheetTableLayout(project, sheetTable.layer, {
+          x: sheetTable.x,
+          y: sheetTable.y,
+          scale: sheetTable.scale,
+        });
+        dragTarget = sheetTable;
+        state.selectedId = sheetTable.id;
+        onSelect(sheetTable);
+        if (sheetTable._resize) {
+          mode = 'sheetResize';
+          sheetResize = {
+            layer: sheetTable.layer,
+            box,
+            startScale: box.userScale || 1,
+          };
+        } else {
+          mode = 'sheetTable';
+          grabOffset = { x: w.x - sheetTable.x, y: w.y - sheetTable.y };
+        }
+        onChange();
+        last = p;
+        return;
+      }
+
       const hit = hitTest(project, w.x, w.y);
       if (hit) {
         mode = 'drag';
@@ -402,6 +432,31 @@
         project.underlay.x = nx;
         project.underlay.y = ny;
         onChange();
+      } else if (mode === 'sheetTable' && dragTarget) {
+        const w = global.Render.screenToWorld(p.x, p.y);
+        let nx = w.x - grabOffset.x;
+        let ny = w.y - grabOffset.y;
+        if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); }
+        const layout = global.Render.setSheetTableLayout(project, dragTarget.layer, { x: nx, y: ny });
+        dragTarget.x = layout.x;
+        dragTarget.y = layout.y;
+        onChange();
+        onSelect(dragTarget);
+      } else if (mode === 'sheetResize' && dragTarget && sheetResize) {
+        const b = sheetResize.box;
+        const rx = (p.x - b.x) / Math.max(1, b.w);
+        const ry = (p.y - b.y) / Math.max(1, b.h);
+        const ratio = Math.max(0.45, Math.min(2.4, Math.max(rx, ry)));
+        const layout = global.Render.setSheetTableLayout(project, dragTarget.layer, {
+          x: b.worldX,
+          y: b.worldY,
+          scale: sheetResize.startScale * ratio,
+        });
+        dragTarget.x = layout.x;
+        dragTarget.y = layout.y;
+        dragTarget.scale = layout.scale;
+        onChange();
+        onSelect(dragTarget);
       } else if (mode === 'pan') {
         global.Render.view.offsetX += p.x - last.x;
         global.Render.view.offsetY += p.y - last.y;
@@ -426,7 +481,7 @@
     };
 
     const onMouseUp = () => {
-      mode = null; dragTarget = null; vertexIndex = -1;
+      mode = null; dragTarget = null; vertexIndex = -1; sheetResize = null;
     };
 
     // ダブルクリックでも多角形を確定できる(3点以上)
@@ -473,6 +528,7 @@
         return;
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedId) {
+        if (state.selectedId.indexOf('sheet-table:') === 0) { e.preventDefault(); return; }
         global.Model.removeById(project, state.selectedId);
         state.selectedId = null;
         onSelect(null);
@@ -480,6 +536,29 @@
         return;
       }
       if (ARROWS[e.key] && state.selectedId) {
+        if (state.selectedId.indexOf('sheet-table:') === 0) {
+          const layer = state.selectedId.replace('sheet-table:', '');
+          const cur = ((project.meta && project.meta.sheetTableLayouts) || {})[layer] || {};
+          if (!Number.isFinite(cur.x) || !Number.isFinite(cur.y)) return;
+          e.preventDefault();
+          const step = snapMm * (e.shiftKey ? 10 : 1);
+          const [dx, dy] = ARROWS[e.key];
+          global.Render.setSheetTableLayout(project, layer, {
+            x: cur.x + dx * step,
+            y: cur.y + dy * step,
+          });
+          onChange();
+          onSelect({
+            id: state.selectedId,
+            kind: 'sheetTable',
+            layer,
+            label: ({ premises: '営業所求積図の表', kyakushitsu: '客室・調理場求積図の表', lighting: '照明・音響設備一覧表' })[layer] || '図面上の表',
+            x: cur.x + dx * step,
+            y: cur.y + dy * step,
+            scale: cur.scale || 1,
+          });
+          return;
+        }
         const found = global.Model.findById(project, state.selectedId);
         if (!found) return;
         e.preventDefault();
