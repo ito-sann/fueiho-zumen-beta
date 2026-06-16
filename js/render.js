@@ -225,12 +225,13 @@
 
   /* 多角形の寸法表示: 各辺の長さ(m)と頂点番号(P1, P2 …)。
    * 頂点番号は座標求積表の「点」列と対応する。 */
-  function drawPolygonDims(ctx, r) {
+  function drawPolygonDims(ctx, r, opts) {
     const pts = polygonScreenPts(r);
     if (pts.length < 3) return;
     const edges = global.Geometry.polygonEdgesM(r);
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    const showPointLabels = !opts || opts.showPointLabels !== false;
     ctx.save();
     ctx.font = `${fontPx(240)}px sans-serif`;
     ctx.textAlign = 'center';
@@ -243,11 +244,13 @@
       const d = Math.hypot(ox, oy) || 1;
       ctx.fillStyle = '#1565c0';
       ctx.fillText(edges[i].toFixed(2) + 'm', mx + (ox / d) * wpx(300), my + (oy / d) * wpx(300));
-      // 頂点番号は頂点の外側に
-      const vx = a.x - cx, vy = a.y - cy;
-      const vd = Math.hypot(vx, vy) || 1;
-      ctx.fillStyle = '#6a1b9a';
-      ctx.fillText('P' + (i + 1), a.x + (vx / vd) * wpx(260), a.y + (vy / vd) * wpx(260));
+      if (showPointLabels) {
+        // 頂点番号は頂点の外側に
+        const vx = a.x - cx, vy = a.y - cy;
+        const vd = Math.hypot(vx, vy) || 1;
+        ctx.fillStyle = '#6a1b9a';
+        ctx.fillText('P' + (i + 1), a.x + (vx / vd) * wpx(260), a.y + (vy / vd) * wpx(260));
+      }
     }
     ctx.restore();
   }
@@ -318,7 +321,12 @@
 
   /* 寸法線(底辺=下、高さ=左、台形は上底=上)。区画の回転に追従する。 */
   function drawDimension(ctx, r) {
-    if (r.shape === 'polygon') { drawPolygonDims(ctx, r); return; }
+    if (r.shape === 'polygon') {
+      drawPolygonDims(ctx, r, {
+        showPointLabels: r.boundaryOnly === true ? r.showPointLabels === true : true,
+      });
+      return;
+    }
     const sc = worldToScreen(r.x + r.w / 2, r.y + r.h / 2);
     const w = r.w * view.zoom, h = r.h * view.zoom;
     const shape = r.shape || 'rect';

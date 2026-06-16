@@ -787,6 +787,7 @@
     region.label = d.label;
     region.showLabel = false;
     region.showDims = true;
+    region.showPointLabels = false;
     region.color = d.color;
     region.boundaryColor = $('boundaryLineColor').value || d.color;
     region.boundaryLineStyle = $('boundaryLineStyle').value || 'solid';
@@ -1314,6 +1315,7 @@
         </select></div>`;
         html += `<label class="prop-row"><span>囲い線色</span><input type="color" id="propBoundaryColor" value="${el.boundaryColor || boundaryColorForUse(G.areaUseForRegion(el))}"></label>`;
         html += `<label class="check-row"><input type="checkbox" data-fieldbool="showDims" ${el.showDims !== false ? 'checked' : ''}> 辺の長さを表示</label>`;
+        html += `<label class="check-row"><input type="checkbox" data-fieldbool="showPointLabels" ${el.showPointLabels === true ? 'checked' : ''}> 頂点番号(P1...)を表示</label>`;
       }
       html += `<label class="check-row"><input type="checkbox" data-fieldbool="showLabel" ${el.showLabel ? 'checked' : ''}> 区画名を図面に表示</label>`;
     } else {
@@ -1595,6 +1597,7 @@
         if (el.boundaryOnly) {
           el.boundaryLineStyle = el.boundaryLineStyle || 'solid';
           el.boundaryColor = el.boundaryColor || boundaryColorForUse(G.areaUseForRegion(el));
+          if (el.showPointLabels !== true) el.showPointLabels = false;
         }
         refresh(); showProps(el);
       };
