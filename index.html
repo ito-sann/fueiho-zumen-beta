@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.31.0">
+  <link rel="stylesheet" href="css/style.css?v=1.32.0">
 </head>
 <body>
   <header class="topbar">
@@ -249,6 +249,22 @@
       </section>
 
       <section class="group">
+        <h3>選択対象</h3>
+        <select id="selectFilter">
+          <option value="all" selected>すべて</option>
+          <option value="dimensions">寸法線だけ</option>
+          <option value="boundary">面積囲い線だけ</option>
+          <option value="regions">区画だけ</option>
+          <option value="furniture">備品だけ</option>
+          <option value="fittings">建具・壁だけ</option>
+          <option value="fixtures">照明・音響だけ</option>
+          <option value="notes">メモ・コメントだけ</option>
+          <option value="premise">営業所外周だけ</option>
+        </select>
+        <p class="muted">重なって選びにくいときに、クリックで選べる種類を絞れます。</p>
+      </section>
+
+      <section class="group">
         <button id="btnFit" class="btn block">全体表示にもどす</button>
         <button id="btnNew" class="btn block danger">新規(クリア)</button>
       </section>
@@ -270,6 +286,11 @@
       <section class="group">
         <h3>選択中の要素</h3>
         <div id="props" class="props"><p class="muted">要素を選ぶと編集できます。</p></div>
+      </section>
+
+      <section class="group">
+        <h3>要素一覧</h3>
+        <div id="elementList" class="element-list"></div>
       </section>
 
       <section class="group">
@@ -313,12 +334,12 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.31.0"></script>
-  <script src="js/geometry.js?v=1.31.0"></script>
-  <script src="js/render.js?v=1.31.0"></script>
-  <script src="js/interactions.js?v=1.31.0"></script>
-  <script src="js/print.js?v=1.31.0"></script>
-  <script src="js/forms.js?v=1.31.0"></script>
-  <script src="js/main.js?v=1.31.0"></script>
+  <script src="js/model.js?v=1.32.0"></script>
+  <script src="js/geometry.js?v=1.32.0"></script>
+  <script src="js/render.js?v=1.32.0"></script>
+  <script src="js/interactions.js?v=1.32.0"></script>
+  <script src="js/print.js?v=1.32.0"></script>
+  <script src="js/forms.js?v=1.32.0"></script>
+  <script src="js/main.js?v=1.32.0"></script>
 </body>
 </html>

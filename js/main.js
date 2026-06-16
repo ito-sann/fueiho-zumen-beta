@@ -7,7 +7,7 @@
         I = global.Interactions, P = global.Printer;
 
   let project = M.defaultProject();
-  const state = { selectedId: null };
+  const state = { selectedId: null, selectFilter: 'all' };
 
   const $ = (id) => document.getElementById(id);
   const canvas = $('canvas');
@@ -164,7 +164,7 @@
   function adoptProject(p, opts) {
     project = p;
     state.selectedId = null;
-    I.attach(canvas, ctx, project, state, draw, showProps);
+    I.attach(canvas, ctx, project, state, draw, selectElement);
     bindMeta();
     if (!(opts && opts.keepView)) R.fitToView(project, canvasCss());
     refresh();
@@ -203,7 +203,7 @@
     // Cmd/Ctrl+Z で元に戻す(Shift付きでやり直す)
     window.addEventListener('keydown', onUndoKeys);
 
-    I.attach(canvas, ctx, project, state, draw, showProps);
+    I.attach(canvas, ctx, project, state, draw, selectElement);
 
     if (!saved) {
       // サンプルの最小構成を1つ置いておく(手応え確認用)
@@ -277,6 +277,11 @@
   function bindToolbar() {
     $('btnUndo').onclick = () => undo();
     $('btnRedo').onclick = () => redo();
+    $('selectFilter').onchange = (e) => {
+      state.selectFilter = e.target.value;
+      renderElementList();
+      draw();
+    };
 
     // 案件の切り替え・追加・削除(自動保存はブラウザ内に案件ごと)
     $('caseSelect').onchange = (e) => {
@@ -902,6 +907,7 @@
     draw();
     applyPanelVisibility();
     renderSummary();
+    renderElementList();
     renderKyuseki();
     renderWarnings();
   }
@@ -926,6 +932,88 @@
     const layer = R.getLayer();
     document.querySelectorAll('section[data-layers]').forEach((el) => {
       el.style.display = el.dataset.layers.split(' ').indexOf(layer) >= 0 ? '' : 'none';
+    });
+  }
+
+  function selectElement(el) {
+    showProps(el);
+    renderElementList();
+  }
+
+  function dimLengthLabel(d) {
+    return G.mmToM(Math.hypot(d.x2 - d.x1, d.y2 - d.y1)).toFixed(2) + 'm';
+  }
+
+  function elementListRows() {
+    const rows = [];
+    const push = (group, kind, el, label, sub) => rows.push({ group, kind, el, label, sub });
+    if (project.premise) {
+      push('外周', 'premise', project.premise, '営業所外周', project.premise.measuredAt === 'center' ? '壁芯寸法' : '内法寸法');
+    }
+    (project.dimensions || []).forEach((d, i) => {
+      push('寸法線', 'dimensions', d, `寸法線 ${i + 1}`, dimLengthLabel(d));
+    });
+    (project.regions || []).forEach((r) => {
+      if (r.boundaryOnly) {
+        push('面積囲い線', 'regions', r, r.label || '面積囲い線', (M.AREA_USES[G.areaUseForRegion(r)] || {}).label || '');
+      }
+    });
+    (project.regions || []).forEach((r) => {
+      if (!r.boundaryOnly) push('区画', 'regions', r, r.label || (M.REGION_TYPES[r.type] || {}).label || '区画', shapeLabel(r.shape || 'rect'));
+    });
+    (project.furniture || []).forEach((f) => push('備品', 'furniture', f, f.label || (M.FURNITURE_CATALOG[f.kind] || {}).label || '備品', `${G.fmtM(f.w)}×${G.fmtM(f.h)}m`));
+    (project.fittings || []).forEach((g) => push('建具・壁', 'fittings', g, g.label || (M.FITTING_CATALOG[g.kind] || {}).label || '建具', `${G.fmtM(g.w)}m`));
+    (project.fixtures || []).forEach((x) => push('照明・音響', 'fixtures', x, (M.FIXTURE_CATALOG[x.kind] || {}).label || '設備', (M.FIXTURE_CATALOG[x.kind] || {}).symbol || ''));
+    (project.notes || []).forEach((n) => push('メモ', 'notes', n, n.leader === false ? 'コメント' : 'メモ', (n.text || '').split('\n')[0] || ''));
+    return rows;
+  }
+
+  function renderElementList() {
+    const box = $('elementList');
+    if (!box) return;
+    const rows = elementListRows();
+    if (!rows.length) {
+      box.innerHTML = '<p class="muted">要素がありません。</p>';
+      return;
+    }
+    let html = '';
+    let group = '';
+    for (const row of rows) {
+      if (row.group !== group) {
+        group = row.group;
+        html += `<div class="element-group-title">${esc(group)}</div>`;
+      }
+      const active = state.selectedId === row.el.id ? ' active' : '';
+      html += `<div class="element-row${active}" data-select-id="${esc(row.el.id)}">
+        <button type="button" class="element-main" data-select-id="${esc(row.el.id)}">
+          <span class="element-name">${esc(row.label)}</span>
+          <span class="element-sub">${esc(row.sub || '')}</span>
+        </button>
+        <button type="button" class="element-delete" data-delete-id="${esc(row.el.id)}">削除</button>
+      </div>`;
+    }
+    box.innerHTML = html;
+    box.querySelectorAll('[data-select-id]').forEach((btn) => {
+      btn.onclick = () => {
+        const found = M.findById(project, btn.dataset.selectId);
+        if (!found) return;
+        state.selectedId = found.element.id;
+        draw();
+        showProps(found.element);
+        renderElementList();
+      };
+    });
+    box.querySelectorAll('[data-delete-id]').forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.deleteId;
+        M.removeById(project, id);
+        if (state.selectedId === id) {
+          state.selectedId = null;
+          showProps(null);
+        }
+        refresh();
+      };
     });
   }
 

@@ -115,6 +115,36 @@ table.summary td { text-align: right; font-weight: 700; padding: 4px 2px; }
 .props .vertex-row span { flex: 0 0 28px; }
 .props .vertex-row input { width: 50%; min-width: 0; }
 
+.element-list { display: flex; flex-direction: column; gap: 4px; }
+.element-group-title {
+  margin: 8px 0 2px; font-size: 11px; font-weight: 700;
+  color: #64748b;
+}
+.element-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px;
+  align-items: stretch;
+}
+.element-main {
+  min-width: 0; border: 1px solid #e2e8f0; background: #fff;
+  border-radius: 5px; padding: 5px 7px; text-align: left; cursor: pointer;
+}
+.element-row.active .element-main {
+  border-color: #2563eb; background: #eff6ff;
+}
+.element-name {
+  display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 12px; color: #1f2937; font-weight: 600;
+}
+.element-sub {
+  display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 11px; color: #64748b; margin-top: 1px;
+}
+.element-delete {
+  border: 1px solid #fca5a5; color: #b91c1c; background: #fff;
+  border-radius: 5px; padding: 0 7px; font-size: 11px; cursor: pointer;
+}
+.element-delete:hover { background: #fef2f2; }
+
 .kyuseki-title { font-size: 12px; font-weight: 600; margin: 10px 0 6px; color: #374151; }
 table.kyuseki.coord { font-size: 11px; }
 table.kyuseki.coord td, table.kyuseki.coord th { padding: 3px 4px; }

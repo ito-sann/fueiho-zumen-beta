@@ -122,36 +122,53 @@
     return null;
   }
 
-  function hitTest(project, wx, wy) {
+  function matchesSelectionFilter(el, kind, filter) {
+    filter = filter || 'all';
+    if (filter === 'all') return true;
+    if (filter === 'boundary') return kind === 'regions' && el.boundaryOnly === true;
+    if (filter === 'regions') return kind === 'regions' && el.boundaryOnly !== true;
+    if (filter === 'premise') return kind === 'premise';
+    return kind === filter;
+  }
+
+  function hitTest(project, wx, wy, filter) {
+    filter = filter || 'all';
     // 最前面のメモを最優先
-    const note = noteAt(project, wx, wy);
+    const note = matchesSelectionFilter(null, 'notes', filter) ? noteAt(project, wx, wy) : null;
     if (note) return note;
     // 手動寸法線(線の近く)
-    const dim = dimAt(project, wx, wy);
+    const dim = matchesSelectionFilter(null, 'dimensions', filter) ? dimAt(project, wx, wy) : null;
     if (dim) return dim;
     // 上に描かれるもの(設備→備品→区画)を優先
-    for (let i = project.fixtures.length - 1; i >= 0; i--) {
-      const x = project.fixtures[i];
-      // アイコン実寸(半径220mm)+余裕。縮小表示中でも最低12px分はつかめるようにする
-      const r = Math.max(280, 12 / global.Render.view.zoom);
-      if (Math.hypot(wx - x.x, wy - x.y) <= r) return x;
+    if (matchesSelectionFilter(null, 'fixtures', filter)) {
+      for (let i = project.fixtures.length - 1; i >= 0; i--) {
+        const x = project.fixtures[i];
+        // アイコン実寸(半径220mm)+余裕。縮小表示中でも最低12px分はつかめるようにする
+        const r = Math.max(280, 12 / global.Render.view.zoom);
+        if (Math.hypot(wx - x.x, wy - x.y) <= r) return x;
+      }
     }
-    const fittings = project.fittings || [];
-    for (let i = fittings.length - 1; i >= 0; i--) {
-      if (inRotatedRect(wx, wy, fittings[i])) return fittings[i];
+    if (matchesSelectionFilter(null, 'fittings', filter)) {
+      const fittings = project.fittings || [];
+      for (let i = fittings.length - 1; i >= 0; i--) {
+        if (inRotatedRect(wx, wy, fittings[i])) return fittings[i];
+      }
     }
-    for (let i = project.furniture.length - 1; i >= 0; i--) {
-      const f = project.furniture[i];
-      const hit = f.shape === 'polygon' ? inPolygon(wx, wy, f) : inRotatedRect(wx, wy, f);
-      if (hit) return f;
+    if (matchesSelectionFilter(null, 'furniture', filter)) {
+      for (let i = project.furniture.length - 1; i >= 0; i--) {
+        const f = project.furniture[i];
+        const hit = f.shape === 'polygon' ? inPolygon(wx, wy, f) : inRotatedRect(wx, wy, f);
+        if (hit) return f;
+      }
     }
     for (let i = project.regions.length - 1; i >= 0; i--) {
       const r = project.regions[i];
+      if (!matchesSelectionFilter(r, 'regions', filter)) continue;
       const hit = r.shape === 'polygon' ? inPolygon(wx, wy, r) : inRotatedRect(wx, wy, r);
       if (hit) return r;
     }
     // 営業所外周は一番下(輪郭線の近くだけ)
-    if (nearPremiseEdge(project, wx, wy)) return project.premise;
+    if (matchesSelectionFilter(project.premise, 'premise', filter) && nearPremiseEdge(project, wx, wy)) return project.premise;
     return null;
   }
 
@@ -321,7 +338,9 @@
 
       // 図面上の表(求積表・設備一覧表)は、表の中をドラッグで移動、
       // 右下ハンドルをドラッグでサイズ変更できる。
-      const sheetTable = global.Render.sheetTableAt(project, p.x, p.y);
+      const sheetTable = (state.selectFilter || 'all') === 'all'
+        ? global.Render.sheetTableAt(project, p.x, p.y)
+        : null;
       if (sheetTable) {
         const box = sheetTable._box;
         global.Render.setSheetTableLayout(project, sheetTable.layer, {
@@ -348,7 +367,7 @@
         return;
       }
 
-      const hit = hitTest(project, w.x, w.y);
+      const hit = hitTest(project, w.x, w.y, state.selectFilter || 'all');
       if (hit) {
         mode = 'drag';
         dragTarget = hit;
