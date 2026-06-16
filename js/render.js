@@ -1496,7 +1496,7 @@
         // 全区画を表示して間取りがわかるようにし、客室・調理場だけ強調(色+寸法)
         return { regionsFill: true, allRegions: true, regionTypes: null,
                  highlightTypes: ['kyakushitsu', 'chubo'],
-                 furniture: false, counterFurniture: true, fittings: false, fixtures: false, dims: true, table: 'kyakuchubo' };
+                 furniture: false, counterFurniture: true, fittings: false, fixtures: false, dims: true, dimsAllRegions: true, table: 'kyakuchubo' };
       case 'lighting':
         return { regionsFill: true, allRegions: true, regionTypes: null,
                  furniture: false, fittings: false, fixtures: true, dims: false, table: 'fixtures' };
@@ -1646,8 +1646,8 @@
       });
     }
     if (vis.dims) {
-      // 寸法は強調対象(求積する区画)にだけ付けて、図面が混み合わないようにする
-      for (const r of regions) { if (isMain(r)) drawDimension(ctx, r); }
+      // 客室・調理場求積図では、通路・トイレ・柱などの長さも確認できるよう全区画に寸法を付ける
+      for (const r of regions) { if (vis.dimsAllRegions || isMain(r)) drawDimension(ctx, r); }
     }
     if (vis.fittings && project.fittings) {
       for (const g of project.fittings) {
