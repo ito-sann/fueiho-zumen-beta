@@ -1662,7 +1662,8 @@
           stroke: strokeFor(el, project),
           code,
         });
-        if (vis.dims && (vis.dimsAllRegions || isMain(el))) {
+        const showRegionDims = !(el.boundaryOnly === true && el.showDims === false);
+        if (vis.dims && showRegionDims && (vis.dimsAllRegions || isMain(el))) {
           // 客室・調理場求積図では、通路・トイレ・柱などの長さも確認できるよう全区画に寸法を付ける
           drawDimension(ctx, el);
         }
