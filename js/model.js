@@ -92,12 +92,24 @@
     ];
   }
 
-  /* キャビネット類(カウンター・L字カウンター・シンク)。蹴込み付きの箱。 */
+  /* キャビネット類(シンク等)。蹴込み付きの箱。 */
   function _cabinet(span, H) {
     const kick = Math.min(100, H * 0.12);
     return [
       _box(0, span, kick, H),                          // 本体
       _box(span * 0.04, span * 0.96, 0, kick),         // 台輪(蹴込み)
+    ];
+  }
+
+  /* カウンター。天板は薄い板として表現し、本体・蹴込みと分ける。 */
+  function _counter(span, H) {
+    const top = Math.min(70, Math.max(45, H * 0.07));
+    const kick = Math.min(100, H * 0.12);
+    const inset = Math.max(25, Math.min(80, span * 0.08));
+    return [
+      _box(0, span, H - top, H),                        // 薄い天板
+      _box(inset, span - inset, kick, H - top),         // カウンター本体
+      _box(inset * 1.4, span - inset * 1.4, 0, kick),   // 蹴込み
     ];
   }
 
@@ -172,11 +184,11 @@
       plain: { label: '四角(省略)', front: _none, side: _none },
     },
     counter: {
-      std:   { label: 'カウンター(蹴込み付き)', front: (d) => _cabinet(d.w, d.height), side: (d) => _cabinet(d.h, d.height) },
+      std:   { label: 'カウンター(薄い天板・蹴込み付き)', front: (d) => _counter(d.w, d.height), side: (d) => _counter(d.h, d.height) },
       plain: { label: '四角(省略)', front: _none, side: _none },
     },
     counterL: {
-      std:   { label: 'L字カウンター(蹴込み付き)', front: (d) => _cabinet(d.w, d.height), side: (d) => _cabinet(d.h, d.height) },
+      std:   { label: 'L字カウンター(薄い天板・蹴込み付き)', front: (d) => _counter(d.w, d.height), side: (d) => _counter(d.h, d.height) },
       plain: { label: '四角(省略)', front: _none, side: _none },
     },
     sofa: {
