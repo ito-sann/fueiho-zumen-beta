@@ -225,6 +225,7 @@
     return `
 <div class="sheet">
   <img src="${img.dataURL}" alt="${escapeHtml(drawingName)}">
+  <div class="frame-scale">縮尺 1/${project.meta.scale}</div>
 </div>`;
   }
 
@@ -248,9 +249,14 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; color: #111; }
   body { font-family: -apple-system, "Hiragino Sans", sans-serif; }
-  .sheet { width: ${page.w}mm; height: ${page.h}mm; overflow: hidden; break-after: page; page-break-after: always; }
+  .sheet { width: ${page.w}mm; height: ${page.h}mm; overflow: hidden; break-after: page; page-break-after: always; position: relative; }
   .sheet:last-child { break-after: auto; page-break-after: auto; }
   .sheet img { display: block; width: 100%; height: 100%; }
+  .frame-scale {
+    position: absolute; right: 6mm; bottom: 5mm; z-index: 2;
+    background: rgba(255,255,255,0.9); border: 0.25mm solid #111;
+    padding: 1.2mm 2.4mm; font-size: 10pt; line-height: 1.2; font-weight: 700;
+  }
   @media print { .noprint { display: none; } }
   .noprint { text-align: center; padding: 8px; }
   .noprint button { font-size: 13px; padding: 6px 16px; cursor: pointer; }
