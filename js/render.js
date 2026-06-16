@@ -20,6 +20,7 @@
   let currentSelectedId = null;
   let sheetTableBoxes = new Map();
   const SHEET_TABLE_PREFIX = 'sheet-table:';
+  const DEFAULT_SHEET_TABLE_SCALE = 0.8;
 
   function setLayer(name) { if (LAYERS[name]) currentLayer = name; }
   function getLayer() { return currentLayer; }
@@ -723,7 +724,7 @@
           label: sheetTableLabel(box.layer),
           x: box.worldX,
           y: box.worldY,
-          scale: layout.scale || 1,
+          scale: layout.scale || DEFAULT_SHEET_TABLE_SCALE,
           _box: box,
           _resize: sx >= box.handle.x && sx <= box.handle.x + box.handle.size &&
                    sy >= box.handle.y && sy <= box.handle.y + box.handle.size,
@@ -798,7 +799,7 @@
     const margin = wpx(250);
     const fitScale = Math.min(1, (avW - margin * 2) / W, (avH - margin * 2) / H);
     const saved = ((project.meta && project.meta.sheetTableLayouts) || {})[layoutKey] || {};
-    const userScale = clampTableScale(saved.scale == null ? 1 : saved.scale);
+    const userScale = clampTableScale(saved.scale == null ? DEFAULT_SHEET_TABLE_SCALE : saved.scale);
     const s = fitScale * userScale;
 
     const w = W * s, h = H * s;

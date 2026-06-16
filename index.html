@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>深夜酒類 図面エディタ</title>
-  <link rel="stylesheet" href="css/style.css?v=1.21.0">
+  <link rel="stylesheet" href="css/style.css?v=1.22.0">
 </head>
 <body>
   <header class="topbar">
@@ -171,7 +171,7 @@
         <label class="field">所在地 <input type="text" id="metaAddr"></label>
         <div class="size-row">
           <label>縮尺
-            <select id="metaScale"><option value="50">1/50</option><option value="100">1/100</option></select>
+            <select id="metaScale"><option value="50">1/50</option><option value="80">1/80</option><option value="100">1/100</option></select>
           </label>
           <label>用紙
             <select id="metaPaper"><option value="A4">A4</option><option value="A3">A3</option></select>
@@ -203,7 +203,7 @@
         <label class="check-row"><input type="checkbox" id="metaFrame"> 用紙枠ガイドを表示</label>
         <label class="check-row"><input type="checkbox" id="metaNorth"> 方位記号(N)を表示</label>
         <label class="check-row"><input type="checkbox" id="printTrueScale"> PDFを実寸の縮尺で印刷(定規で正確に1/縮尺)</label>
-        <p class="muted">チェックすると、PDFが用紙に「収める」のではなく、実際に1/縮尺どおりの大きさで出力されます。印刷時はダイアログの倍率を「100%(実際のサイズ)」にしてください。図面が用紙からはみ出す場合は用紙をA3にするか縮尺を1/100にします。</p>
+        <p class="muted">チェックすると、PDFが用紙に「収める」のではなく、実際に1/縮尺どおりの大きさで出力されます。印刷時はダイアログの倍率を「100%(実際のサイズ)」にしてください。図面が用紙からはみ出す場合は用紙をA3にするか縮尺を1/80・1/100にします。</p>
         <p class="muted">用紙サイズ×縮尺の範囲を青い破線で表示します。この枠内に収めると1枚に収まります。方位記号(N)は表示中に先端をドラッグで回転できます。</p>
       </section>
 
@@ -282,12 +282,12 @@
     </div>
   </div>
 
-  <script src="js/model.js?v=1.21.0"></script>
-  <script src="js/geometry.js?v=1.21.0"></script>
-  <script src="js/render.js?v=1.21.0"></script>
-  <script src="js/interactions.js?v=1.21.0"></script>
-  <script src="js/print.js?v=1.21.0"></script>
-  <script src="js/forms.js?v=1.21.0"></script>
-  <script src="js/main.js?v=1.21.0"></script>
+  <script src="js/model.js?v=1.22.0"></script>
+  <script src="js/geometry.js?v=1.22.0"></script>
+  <script src="js/render.js?v=1.22.0"></script>
+  <script src="js/interactions.js?v=1.22.0"></script>
+  <script src="js/print.js?v=1.22.0"></script>
+  <script src="js/forms.js?v=1.22.0"></script>
+  <script src="js/main.js?v=1.22.0"></script>
 </body>
 </html>

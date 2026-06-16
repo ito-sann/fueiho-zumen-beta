@@ -1097,7 +1097,7 @@
       const cur = layouts[layer] || {};
       const x = Number.isFinite(cur.x) ? cur.x : el.x;
       const y = Number.isFinite(cur.y) ? cur.y : el.y;
-      const scale = cur.scale || el.scale || 1;
+      const scale = cur.scale || el.scale || 0.8;
       box.innerHTML = `<div class="prop-row"><span>種別</span><b>${esc(el.label || '図面上の表')}</b></div>
         <label class="prop-row"><span>X位置(mm)</span><input type="number" step="10" id="sheetTableX" value="${Math.round(x || 0)}"></label>
         <label class="prop-row"><span>Y位置(mm)</span><input type="number" step="10" id="sheetTableY" value="${Math.round(y || 0)}"></label>
