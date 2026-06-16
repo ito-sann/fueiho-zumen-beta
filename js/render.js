@@ -1631,8 +1631,12 @@
       });
     }
 
-    const regions = project.regions.filter((r) =>
-      vis.allRegions || (vis.regionTypes && vis.regionTypes.indexOf(r.type) >= 0));
+    const regions = project.regions.filter((r) => {
+      // 面積計算のための囲い線は、照明・音響設備図には出さない。
+      // 設備図では部屋の下地だけ見せ、求積用の赤/緑/青線で混乱しないようにする。
+      if (currentLayer === 'lighting' && r.boundaryOnly === true) return false;
+      return vis.allRegions || (vis.regionTypes && vis.regionTypes.indexOf(r.type) >= 0);
+    });
 
     // highlightTypes がある図面では、対象の区画だけ強調し、他は薄く描いて間取りを示す
     const isMain = (r) => !vis.highlightTypes || vis.highlightTypes.indexOf(global.Geometry.areaUseForRegion(r)) >= 0;
