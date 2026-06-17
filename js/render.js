@@ -1658,23 +1658,34 @@
     }
     const visibleRegionIds = new Set(regions.map((r) => r.id));
     const furnitureNums = global.Geometry.furnitureNumberMap(project);
+    const drawVisibleRegion = (el) => {
+      const code = regionCodeMap.get(el.id) || ''; // 柱は求積符号を振らない
+      drawRegion(ctx, el, {
+        fill: vis.regionsFill,
+        muted: !isMain(el),
+        selected: state.selectedId === el.id,
+        stroke: strokeFor(el, project),
+        code,
+      });
+      const showRegionDims = !(el.boundaryOnly === true && el.showDims === false);
+      if (vis.dims && showRegionDims && (vis.dimsAllRegions || isMain(el))) {
+        // 客室・調理場求積図では、通路・トイレ・柱などの長さも確認できるよう全区画に寸法を付ける
+        drawDimension(ctx, el);
+      }
+    };
+
+    if (currentLayer === 'lighting') {
+      // 照明・音響設備図では、区画を設備記号の下地として必ず先に描く。
+      // 重なり順の影響で多角形区画が設備図から抜けて見えるのを防ぐ。
+      for (const r of regions) drawVisibleRegion(r);
+    }
+
     for (const item of global.Model.sortedOrderableItems(project)) {
       const el = item.element;
       if (item.kind === 'regions') {
+        if (currentLayer === 'lighting') continue;
         if (!visibleRegionIds.has(el.id)) continue;
-        const code = regionCodeMap.get(el.id) || ''; // 柱は求積符号を振らない
-        drawRegion(ctx, el, {
-          fill: vis.regionsFill,
-          muted: !isMain(el),
-          selected: state.selectedId === el.id,
-          stroke: strokeFor(el, project),
-          code,
-        });
-        const showRegionDims = !(el.boundaryOnly === true && el.showDims === false);
-        if (vis.dims && showRegionDims && (vis.dimsAllRegions || isMain(el))) {
-          // 客室・調理場求積図では、通路・トイレ・柱などの長さも確認できるよう全区画に寸法を付ける
-          drawDimension(ctx, el);
-        }
+        drawVisibleRegion(el);
       } else if (item.kind === 'fittings') {
         if (vis.fittings) drawFitting(ctx, el, { selected: state.selectedId === el.id });
       } else if (item.kind === 'furniture') {
