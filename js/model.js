@@ -260,6 +260,7 @@
     chandelier:  { label: 'シャンデリア',     symbol: 'CH' },
     tablelight:  { label: 'テーブルライト',   symbol: 'TL' },
     bracket:     { label: 'ブラケット',       symbol: 'BR' },
+    heatbulb:     { label: '熱電球',           symbol: 'HL' },
     fluorescent: { label: '蛍光灯',           symbol: 'FL' },
     speaker:     { label: 'スピーカー',       symbol: 'SPK' },
     monitor:     { label: 'モニター',         symbol: 'MON' },

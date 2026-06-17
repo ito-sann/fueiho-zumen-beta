@@ -1,17 +1,17 @@
-const CACHE_NAME = 'shinya-zumen-v1.38.0';
+const CACHE_NAME = 'shinya-zumen-v1.39.0';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
   './icons/app-icon.svg',
-  './css/style.css?v=1.38.0',
-  './js/model.js?v=1.38.0',
-  './js/geometry.js?v=1.38.0',
-  './js/render.js?v=1.38.0',
-  './js/interactions.js?v=1.38.0',
-  './js/print.js?v=1.38.0',
-  './js/forms.js?v=1.38.0',
-  './js/main.js?v=1.38.0',
+  './css/style.css?v=1.39.0',
+  './js/model.js?v=1.39.0',
+  './js/geometry.js?v=1.39.0',
+  './js/render.js?v=1.39.0',
+  './js/interactions.js?v=1.39.0',
+  './js/print.js?v=1.39.0',
+  './js/forms.js?v=1.39.0',
+  './js/main.js?v=1.39.0',
 ];
 
 self.addEventListener('install', (event) => {
