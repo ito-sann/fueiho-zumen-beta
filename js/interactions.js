@@ -169,11 +169,17 @@
     return f && (f.kind === 'counter' || f.kind === 'counterL' || /カウンター/.test(f.label || ''));
   }
 
+  function isAreaBoundaryLine(r) {
+    if (!r || r.boundaryOnly !== true) return false;
+    if (r.boundaryArea === true) return true;
+    return ['営業所囲い', '客室囲い', '調理場囲い'].indexOf(r.label || '') >= 0;
+  }
+
   function visibleForHit(project, kind, el) {
     const layer = global.Render.getLayer();
     const vis = global.Render.visibility(layer);
     if (kind === 'regions') {
-      if (layer === 'lighting' && el.boundaryOnly === true) return false;
+      if (layer === 'lighting' && isAreaBoundaryLine(el)) return false;
       return vis.allRegions || (vis.regionTypes && vis.regionTypes.indexOf(el.type) >= 0);
     }
     if (kind === 'fittings') return !!vis.fittings;

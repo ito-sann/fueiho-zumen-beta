@@ -198,6 +198,12 @@
     return global.Geometry.isPillarRegion && global.Geometry.isPillarRegion(r);
   }
 
+  function isAreaBoundaryLine(r) {
+    if (!r || r.boundaryOnly !== true) return false;
+    if (r.boundaryArea === true) return true;
+    return ['営業所囲い', '客室囲い', '調理場囲い'].indexOf(r.label || '') >= 0;
+  }
+
   /* 多角形区画を描く(塗り・輪郭・ラベル・選択時は頂点ハンドル) */
   function drawPolygonRegion(ctx, r, opts) {
     const pts = polygonScreenPts(r);
@@ -1656,7 +1662,7 @@
     const regions = project.regions.filter((r) => {
       // 面積計算のための囲い線は、照明・音響設備図には出さない。
       // 設備図では部屋の下地だけ見せ、求積用の赤/緑/青線で混乱しないようにする。
-      if (currentLayer === 'lighting' && r.boundaryOnly === true) return false;
+      if (currentLayer === 'lighting' && isAreaBoundaryLine(r)) return false;
       return vis.allRegions || (vis.regionTypes && vis.regionTypes.indexOf(r.type) >= 0);
     });
 

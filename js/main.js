@@ -782,6 +782,7 @@
 
   function applyBoundaryRegionStyle(region, use) {
     const d = BOUNDARY_AREA_DEFAULTS[use] || BOUNDARY_AREA_DEFAULTS.kyakushitsu;
+    region.boundaryArea = true;
     region.boundaryOnly = true;
     region.areaUse = use;
     region.label = d.label;
