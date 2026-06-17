@@ -1451,11 +1451,14 @@
       html += `<div class="prop-row"><span>形</span><b>${shapeLabel(shape)}</b></div>`;
       if (shape === 'polygon') {
         // 頂点の座標(絶対mm)を1点ずつ編集できる。キャンバス上のドラッグでも修正可。
+        html += propNum('角度(度)', 'rotation', el.rotation || 0);
         html += '<p class="muted">頂点はキャンバス上でドラッグでも動かせます。</p>';
+        const absPts = G.polygonAbsPoints(el);
         el.points.forEach((p, i) => {
+          const abs = absPts[i] || { x: el.x + p.x, y: el.y + p.y };
           html += `<div class="prop-row vertex-row"><span>P${i + 1}</span>
-            <input type="number" step="10" data-vx="${i}" value="${el.x + p.x}" title="X(mm)">
-            <input type="number" step="10" data-vy="${i}" value="${el.y + p.y}" title="Y(mm)"></div>`;
+            <input type="number" step="10" data-vx="${i}" value="${Math.round(abs.x)}" title="X(mm)">
+            <input type="number" step="10" data-vy="${i}" value="${Math.round(abs.y)}" title="Y(mm)"></div>`;
         });
       } else {
         const wLabel = shape === 'rect' ? '幅(mm)' : shape === 'triangle' ? '底辺(mm)' : '下底(mm)';
@@ -1612,8 +1615,18 @@
         const isX = 'vx' in e.target.dataset;
         const i = parseInt(isX ? e.target.dataset.vx : e.target.dataset.vy, 10);
         const v = parseFloat(e.target.value) || 0;
-        if (isX) el.points[i].x = v - el.x;
-        else el.points[i].y = v - el.y;
+        const abs = G.polygonAbsPoints(el)[i] || { x: el.x + el.points[i].x, y: el.y + el.points[i].y };
+        const wx = isX ? v : abs.x;
+        const wy = isX ? abs.y : v;
+        const angle = -(el.rotation || 0) * Math.PI / 180;
+        const cx = el.x + (el.w || 0) / 2;
+        const cy = el.y + (el.h || 0) / 2;
+        const dx = wx - cx;
+        const dy = wy - cy;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        el.points[i].x = (cx + dx * cos - dy * sin) - el.x;
+        el.points[i].y = (cy + dx * sin + dy * cos) - el.y;
         M.normalizePolygon(el);
         refresh(); showProps(el);
       });

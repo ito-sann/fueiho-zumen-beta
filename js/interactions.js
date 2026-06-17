@@ -12,17 +12,32 @@
 
   /* 多角形の内側判定(レイキャスティング法)。座標は絶対mm。 */
   function inPolygon(wx, wy, region) {
-    const pts = region.points || [];
+    const pts = global.Geometry.polygonAbsPoints(region);
     let inside = false;
     for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-      const xi = region.x + pts[i].x, yi = region.y + pts[i].y;
-      const xj = region.x + pts[j].x, yj = region.y + pts[j].y;
+      const xi = pts[i].x, yi = pts[i].y;
+      const xj = pts[j].x, yj = pts[j].y;
       if ((yi > wy) !== (yj > wy) &&
           wx < (xj - xi) * (wy - yi) / (yj - yi) + xi) {
         inside = !inside;
       }
     }
     return inside;
+  }
+
+  function unrotatePolygonPoint(region, wx, wy) {
+    const angle = -(region.rotation || 0) * Math.PI / 180;
+    if (!angle) return { x: wx - region.x, y: wy - region.y };
+    const cx = region.x + (region.w || 0) / 2;
+    const cy = region.y + (region.h || 0) / 2;
+    const dx = wx - cx;
+    const dy = wy - cy;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return {
+      x: (cx + dx * cos - dy * sin) - region.x,
+      y: (cy + dx * sin + dy * cos) - region.y,
+    };
   }
 
   /* 多角形の作図を開始する。クリックで頂点を置き、最初の点をクリック
@@ -218,8 +233,9 @@
       if (!found || found.element.shape !== 'polygon' ||
           (found.kind !== 'regions' && found.kind !== 'premise' && found.kind !== 'furniture')) return null;
       const r = found.element;
+      const pts = global.Geometry.polygonAbsPoints(r);
       for (let i = 0; i < r.points.length; i++) {
-        const s = global.Render.worldToScreen(r.x + r.points[i].x, r.y + r.points[i].y);
+        const s = global.Render.worldToScreen(pts[i].x, pts[i].y);
         if (Math.hypot(p.x - s.x, p.y - s.y) <= 8) return { region: r, index: i };
       }
       return null;
@@ -436,7 +452,7 @@
         const w = global.Render.screenToWorld(p.x, p.y);
         let nx = w.x, ny = w.y;
         if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); }
-        dragTarget.points[vertexIndex] = { x: nx - dragTarget.x, y: ny - dragTarget.y };
+        dragTarget.points[vertexIndex] = unrotatePolygonPoint(dragTarget, nx, ny);
         global.Model.normalizePolygon(dragTarget);
         onChange();
         onSelect(dragTarget);

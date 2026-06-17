@@ -28,6 +28,26 @@
     return `(${n})`;
   }
 
+  function polygonAbsPoints(region) {
+    const pts = region.points || [];
+    const angle = (region.rotation || 0) * Math.PI / 180;
+    if (!angle) return pts.map((p) => ({ x: region.x + p.x, y: region.y + p.y }));
+    const cx = region.x + (region.w || 0) / 2;
+    const cy = region.y + (region.h || 0) / 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return pts.map((p) => {
+      const ax = region.x + p.x;
+      const ay = region.y + p.y;
+      const dx = ax - cx;
+      const dy = ay - cy;
+      return {
+        x: cx + dx * cos - dy * sin,
+        y: cy + dx * sin + dy * cos,
+      };
+    });
+  }
+
   /* 多角形の頂点を m(小数第2位=cm 単位)に変換した配列を返す。
    * 座標求積表の表示値と面積計算を一致させるため、必ず丸めた値を使う。 */
   function polygonPointsM(region) {
@@ -211,11 +231,11 @@
   /* 点(絶対mm)が区画の内側にあるか。回転した基本図形にも対応する。 */
   function pointInRegion(region, wx, wy) {
     if (region.shape === 'polygon') {
-      const pts = region.points || [];
+      const pts = polygonAbsPoints(region);
       let inside = false;
       for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-        const xi = region.x + pts[i].x, yi = region.y + pts[i].y;
-        const xj = region.x + pts[j].x, yj = region.y + pts[j].y;
+        const xi = pts[i].x, yi = pts[i].y;
+        const xj = pts[j].x, yj = pts[j].y;
         if ((yi > wy) !== (yj > wy) &&
             wx < (xj - xi) * (wy - yi) / (yj - yi) + xi) {
           inside = !inside;
@@ -556,7 +576,7 @@
     mmToM, fmtM, code, regionCalc, regionAreaSqm, regionRow, buildTable,
     isPillarRegion, areaUseForRegion, isPremisesAreaBoundary, hasPremisesAreaBoundary, hasAnyAreaBoundary,
     pointInRegion, pillarsInRegion, pillarDeductions, regionNetAreaSqm,
-    polygonCalc, polygonEdgesM, polygonPointsM,
+    polygonAbsPoints, polygonCalc, polygonEdgesM, polygonPointsM,
     offsetPolygonAbs, premiseCenterlineAbs, premiseWallPolysAbs, premiseRegionLike, premiseCalc,
     furnitureGroups, furnitureNumberMap, furnKey,
     summary, sightlineWarnings, kyakushitsuSizeWarnings, KYAKUSHITSU_MIN_SQM,

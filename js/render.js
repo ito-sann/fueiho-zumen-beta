@@ -166,7 +166,7 @@
 
   /* 多角形区画の頂点を画面座標で返す */
   function polygonScreenPts(r) {
-    return (r.points || []).map((p) => worldToScreen(r.x + p.x, r.y + p.y));
+    return global.Geometry.polygonAbsPoints(r).map((p) => worldToScreen(p.x, p.y));
   }
 
   function shouldDrawRegionLabel(r) {
@@ -1554,7 +1554,7 @@
   function regionOutlinePoints(r) {
     if (!r) return [];
     if (r.shape === 'polygon') {
-      return (r.points || []).map((p) => worldToScreen(r.x + p.x, r.y + p.y));
+      return polygonScreenPts(r);
     }
     const cx = r.x + r.w / 2;
     const cy = r.y + r.h / 2;
