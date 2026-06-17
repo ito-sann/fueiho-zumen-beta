@@ -93,6 +93,8 @@ table.summary td { text-align: right; font-weight: 700; padding: 4px 2px; }
 .props .prop-row input { flex: 1; }
 .props .prop-row b { color: #1f2937; }
 .props .btn { margin-top: 8px; width: 100%; }
+.props .check-stack { flex: 1 1 auto; }
+.props .check-stack .check-row { margin: 2px 0; }
 
 /* 文字サイズの −/＋/標準 コントロール(Googleドキュメント風)。
  * .prop-row span の幅90px固定に負けないよう詳細度を上げる。 */

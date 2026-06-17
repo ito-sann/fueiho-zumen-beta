@@ -1488,6 +1488,9 @@
   }
 
   function dimVisibleOnLayer(dim, layer) {
+    if (Array.isArray(dim.layers) && dim.layers.length) {
+      return dim.layers.indexOf(layer) >= 0;
+    }
     const l = dim.layer || 'drawings';
     const drawingLayers = ['plan', 'premises', 'kyakushitsu'];
     if (l === 'drawings') return drawingLayers.indexOf(layer) >= 0;

@@ -1352,8 +1352,21 @@
     if (kind === 'dimensions') {
       // 寸法線: 長さ(自動)と表示する図面、両端の座標(直接入力も可)
       const lenM = G.mmToM(Math.hypot(el.x2 - el.x1, el.y2 - el.y1));
+      const dimLayers = Array.isArray(el.layers) && el.layers.length
+        ? el.layers
+        : ['plan', 'premises', 'kyakushitsu'];
+      const dimLayerOptions = [
+        ['plan', '平面図'],
+        ['premises', '営業所求積図'],
+        ['kyakushitsu', '客室・調理場求積図'],
+        ['lighting', '照明・音響設備図'],
+      ];
       html += `<div class="prop-row"><span>長さ</span><b id="propDimLen">${lenM.toFixed(2)} m</b></div>`;
-      html += '<div class="prop-row"><span>表示する図面</span><b>平面図・営業所求積図・客室調理場求積図</b></div>';
+      html += '<div class="prop-row"><span>表示する図面</span><div class="check-stack">';
+      dimLayerOptions.forEach(([layer, label]) => {
+        html += `<label class="check-row"><input type="checkbox" data-dim-layer="${layer}" ${dimLayers.indexOf(layer) >= 0 ? 'checked' : ''}> ${label}</label>`;
+      });
+      html += '</div></div>';
       html += propNum('始点X(mm)', 'x1', el.x1) + propNum('始点Y(mm)', 'y1', el.y1);
       html += propNum('終点X(mm)', 'x2', el.x2) + propNum('終点Y(mm)', 'y2', el.y2);
       html += '<p class="muted">両端の□はキャンバス上でドラッグでも動かせます。</p>';
@@ -1642,6 +1655,25 @@
         buildLayerTabs();
         refresh();
       };
+    }
+    const dimLayerChecks = Array.from(box.querySelectorAll('[data-dim-layer]'));
+    if (dimLayerChecks.length) {
+      dimLayerChecks.forEach((inp) => {
+        inp.onchange = () => {
+          const layers = dimLayerChecks.filter((check) => check.checked).map((check) => check.dataset.dimLayer);
+          if (!layers.length) {
+            inp.checked = true;
+            return;
+          }
+          el.layers = layers;
+          el.layer = 'custom';
+          if (layers.indexOf(R.getLayer()) < 0) {
+            R.setLayer(layers[0]);
+            buildLayerTabs();
+          }
+          refresh(); showProps(el);
+        };
+      });
     }
     const dupBtn = box.querySelector('#btnDup');
     if (dupBtn) dupBtn.onclick = duplicateSelected;
