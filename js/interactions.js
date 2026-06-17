@@ -73,14 +73,33 @@
     if (pts.length >= 3) d.onDone(pts);
   }
 
-  /* 回転した長方形の内側判定。要素の中心まわりに -rotation だけ戻して矩形判定する。 */
-  function inRotatedRect(wx, wy, el) {
+  function localRotatedPoint(wx, wy, el) {
     const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
     const a = -(el.rotation || 0) * Math.PI / 180;
     const dx = wx - cx, dy = wy - cy;
-    const lx = dx * Math.cos(a) - dy * Math.sin(a);
-    const ly = dx * Math.sin(a) + dy * Math.cos(a);
+    return {
+      x: dx * Math.cos(a) - dy * Math.sin(a),
+      y: dx * Math.sin(a) + dy * Math.cos(a),
+    };
+  }
+
+  /* 回転した長方形の内側判定。要素の中心まわりに -rotation だけ戻して矩形判定する。 */
+  function inRotatedRect(wx, wy, el) {
+    const p = localRotatedPoint(wx, wy, el);
+    const lx = p.x, ly = p.y;
     return Math.abs(lx) <= el.w / 2 && Math.abs(ly) <= el.h / 2;
+  }
+
+  function inCounterL(wx, wy, el) {
+    const p = localRotatedPoint(wx, wy, el);
+    const lx = p.x, ly = p.y;
+    const w = el.w || 0, h = el.h || 0;
+    const t = Math.min(el.t || 600, w, h);
+    const inTopArm = lx >= -w / 2 && lx <= w / 2 && ly >= -h / 2 && ly <= -h / 2 + t;
+    const inSideArm = el.mirrorL === true
+      ? lx >= w / 2 - t && lx <= w / 2 && ly >= -h / 2 && ly <= h / 2
+      : lx >= -w / 2 && lx <= -w / 2 + t && ly >= -h / 2 && ly <= h / 2;
+    return inTopArm || inSideArm;
   }
 
   /* 点と線分の距離(mm)。営業所外周は「線の近く」だけつかめるようにする。 */
@@ -183,7 +202,9 @@
       } else if (item.kind === 'fittings') {
         if (inRotatedRect(wx, wy, el)) return el;
       } else if (item.kind === 'furniture') {
-        const hit = el.shape === 'polygon' ? inPolygon(wx, wy, el) : inRotatedRect(wx, wy, el);
+        const hit = el.shape === 'polygon' ? inPolygon(wx, wy, el)
+          : el.kind === 'counterL' ? inCounterL(wx, wy, el)
+            : inRotatedRect(wx, wy, el);
         if (hit) return el;
       } else if (item.kind === 'regions') {
         const hit = el.shape === 'polygon' ? inPolygon(wx, wy, el) : inRotatedRect(wx, wy, el);

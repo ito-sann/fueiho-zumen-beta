@@ -164,6 +164,27 @@
     ctx.closePath();
   }
 
+  function counterLPoints(w, h, t, mirror) {
+    if (mirror) {
+      return [
+        [-w / 2, -h / 2],
+        [w / 2, -h / 2],
+        [w / 2, h / 2],
+        [w / 2 - t, h / 2],
+        [w / 2 - t, -h / 2 + t],
+        [-w / 2, -h / 2 + t],
+      ];
+    }
+    return [
+      [-w / 2, -h / 2],
+      [w / 2, -h / 2],
+      [w / 2, -h / 2 + t],
+      [-w / 2 + t, -h / 2 + t],
+      [-w / 2 + t, h / 2],
+      [-w / 2, h / 2],
+    ];
+  }
+
   /* 多角形区画の頂点を画面座標で返す */
   function polygonScreenPts(r) {
     return global.Geometry.polygonAbsPoints(r).map((p) => worldToScreen(p.x, p.y));
@@ -423,16 +444,9 @@
     ctx.strokeStyle = opts.selected ? '#d32f2f' : (over ? '#c62828' : '#555');
     const isL = f.kind === 'counterL';
     if (isL) {
-      // L字: 外形 w×h から右下を欠いた形。上辺が横の腕、左辺が縦の腕。
+      // L字: 上辺が横の腕。mirrorL で縦の腕を左右反転する。
       const t = Math.min(f.t || 600, f.w, f.h) * view.zoom;
-      ctx.beginPath();
-      ctx.moveTo(-w / 2, -h / 2);          // 左上
-      ctx.lineTo(w / 2, -h / 2);           // 右上
-      ctx.lineTo(w / 2, -h / 2 + t);       // 右上から厚み分下へ
-      ctx.lineTo(-w / 2 + t, -h / 2 + t);  // 内側の角
-      ctx.lineTo(-w / 2 + t, h / 2);       // 左の腕の内側を下へ
-      ctx.lineTo(-w / 2, h / 2);           // 左下
-      ctx.closePath();
+      tracePoly(ctx, counterLPoints(w, h, t, f.mirrorL === true));
       ctx.fill();
       ctx.stroke();
     } else {

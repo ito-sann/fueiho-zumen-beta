@@ -33,7 +33,7 @@
     table:    { label: 'テーブル',   w: 600,  h: 600, height: 700  },
     chair:    { label: '椅子',       w: 450,  h: 450, height: 800  },
     counter:  { label: 'カウンター', w: 3200, h: 600, height: 1000 },
-    /* t = カウンターの厚み(腕の幅)。L字は外形 w×h から右下を欠いた形。 */
+    /* t = カウンターの厚み(腕の幅)。L字は外形 w×h から下側の片側を欠いた形。 */
     counterL: { label: 'L字カウンター', w: 2700, h: 1800, height: 1000, t: 600 },
     sofa:     { label: 'ソファ',     w: 1800, h: 700, height: 800  },
     shelf:    { label: '棚',         w: 900,  h: 400, height: 1800 },
@@ -508,7 +508,10 @@
     // 姿図スタイル(正面図・側面図の形)。未指定なら既定スタイル
     const ds = defaultStyle(kind);
     if (ds) item.variant = variant || ds;
-    if (c.t) item.t = c.t; // L字カウンター等の厚み
+    if (c.t) {
+      item.t = c.t; // L字カウンター等の厚み
+      if (kind === 'counterL') item.mirrorL = false;
+    }
     project.furniture.push(item);
     return item;
   }

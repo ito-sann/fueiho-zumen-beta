@@ -1384,8 +1384,9 @@
       html += propNum(kind === 'fittings' ? '長さ(mm)' : '幅(mm)', 'w', el.w);
       html += propNum(kind === 'fittings' ? '厚み(mm)' : '奥行(mm)', 'h', el.h);
       if (el.kind === 'counterL') {
-        // L字カウンターの腕の幅(天板の奥行)。外形 w×h の右下をくり抜く量が変わる
+        // L字カウンターの腕の幅(天板の奥行)と、縦の腕を左右どちらに出すかを調整できる
         html += propNum('カウンター幅(mm)', 't', el.t || 600);
+        html += `<label class="check-row"><input type="checkbox" data-fieldbool="mirrorL" ${el.mirrorL ? 'checked' : ''}> L字の突起を左右反転</label>`;
       }
       html += propNum('角度(度)', 'rotation', el.rotation || 0);
       // 扉・戸は開き勝手(開く方向)を切り替えられる
