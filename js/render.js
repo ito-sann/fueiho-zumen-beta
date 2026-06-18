@@ -1526,25 +1526,25 @@
   function visibility(layer) {
     switch (layer) {
       case 'plan':
-        return { regionsFill: true, allRegions: true, regionTypes: null,
+        return { regionsFill: false, allRegions: true, regionTypes: null,
                  furniture: true, fittings: true, fixtures: false, dims: true, table: false };
       case 'premises':
         return { regionsFill: false, allRegions: true, regionTypes: null,
                  furniture: false, counterFurniture: true, fittings: false, fixtures: false, dims: true, table: 'all' };
       case 'kyakushitsu':
-        // 全区画を表示して間取りがわかるようにし、客室・調理場だけ強調(色+寸法)
-        return { regionsFill: true, allRegions: true, regionTypes: null,
+        // 全区画を表示して間取りがわかるようにし、客室・調理場だけ寸法を強調する
+        return { regionsFill: false, allRegions: true, regionTypes: null,
                  highlightTypes: ['kyakushitsu', 'chubo'],
                  furniture: false, counterFurniture: true, fittings: false, fixtures: false, dims: true, dimsAllRegions: true, table: 'kyakuchubo' };
       case 'lighting':
-        return { regionsFill: true, allRegions: true, regionTypes: null,
+        return { regionsFill: false, allRegions: true, regionTypes: null,
                  furniture: false, fittings: false, fixtures: true, dims: false, table: 'fixtures' };
       case 'furnviews':
         // 備品姿図: 間取りは描かず、備品の正面図・側面図だけを並べる
         return { regionsFill: false, allRegions: false, regionTypes: [],
                  furniture: false, fittings: false, fixtures: false, dims: false, table: 'furniture' };
       default:
-        return { regionsFill: true, allRegions: true, regionTypes: null,
+        return { regionsFill: false, allRegions: true, regionTypes: null,
                  furniture: true, fittings: true, fixtures: true, dims: true, table: false };
     }
   }
