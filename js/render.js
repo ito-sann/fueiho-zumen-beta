@@ -90,7 +90,7 @@
     ctx.lineWidth = 1;
     // 10cm 細線(ズームが十分なときだけ)
     if (view.zoom > 0.03) {
-      ctx.strokeStyle = '#f0f0f0';
+      ctx.strokeStyle = '#e8e8e8';
       for (let x = Math.floor(tl.x / sub) * sub; x < br.x; x += sub) {
         const s = worldToScreen(x, 0);
         ctx.beginPath(); ctx.moveTo(s.x, 0); ctx.lineTo(s.x, canvas.height); ctx.stroke();
@@ -101,7 +101,7 @@
       }
     }
     // 1m 太線
-    ctx.strokeStyle = '#e0e0e0';
+    ctx.strokeStyle = '#d6d6d6';
     for (let x = Math.floor(tl.x / step) * step; x < br.x; x += step) {
       const s = worldToScreen(x, 0);
       ctx.beginPath(); ctx.moveTo(s.x, 0); ctx.lineTo(s.x, canvas.height); ctx.stroke();
