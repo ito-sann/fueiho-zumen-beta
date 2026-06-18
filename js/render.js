@@ -204,6 +204,49 @@
     return ['営業所囲い', '客室囲い', '調理場囲い'].indexOf(r.label || '') >= 0;
   }
 
+  function hiddenEdgeSet(r) {
+    return new Set((r.hiddenEdges || [])
+      .map((n) => parseInt(n, 10))
+      .filter((n) => Number.isFinite(n) && n >= 0));
+  }
+
+  function strokeVisibleEdges(ctx, pts, r) {
+    const hidden = hiddenEdgeSet(r);
+    for (let i = 0; i < pts.length; i++) {
+      if (hidden.has(i)) continue;
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+  }
+
+  function drawSelectedEdgeLabels(ctx, pts, hidden) {
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.font = `${fontPx(180)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      const x = (a.x + b.x) / 2;
+      const y = (a.y + b.y) / 2;
+      ctx.fillStyle = hidden.has(i) ? '#fff' : '#fff7ed';
+      ctx.strokeStyle = hidden.has(i) ? '#94a3b8' : '#f97316';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(x - 16, y - 9, 32, 18);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = hidden.has(i) ? '#64748b' : '#c2410c';
+      ctx.fillText('辺' + (i + 1), x, y);
+    }
+    ctx.restore();
+  }
+
   /* 多角形区画を描く(塗り・輪郭・ラベル・選択時は頂点ハンドル) */
   function drawPolygonRegion(ctx, r, opts) {
     const pts = polygonScreenPts(r);
@@ -225,7 +268,7 @@
     ctx.strokeStyle = opts.selected ? '#d32f2f'
       : (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333')));
     if (boundaryOnly) ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
-    ctx.stroke();
+    strokeVisibleEdges(ctx, pts, r);
     if (shouldDrawRegionLabel(r)) {
       // ラベルは重心に置く(既定320mm相当・全体設定・個別指定で調整可)
       const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
@@ -238,6 +281,8 @@
     }
     // 選択中は頂点ハンドル(ドラッグで形を修正できる)
     if (opts.selected) {
+      drawSelectedEdgeLabels(ctx, pts, hiddenEdgeSet(r));
+      ctx.setLineDash([]);
       for (const p of pts) {
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = '#d32f2f';
@@ -316,13 +361,14 @@
     const sc = worldToScreen(r.x + r.w / 2, r.y + r.h / 2); // 中心
     const w = r.w * view.zoom, h = r.h * view.zoom;
     const w2 = (r.w2 != null ? r.w2 : r.w) * view.zoom;
-    const pts = shapePoints(r.shape || 'rect', w, h, w2);
+    const ptsRaw = shapePoints(r.shape || 'rect', w, h, w2);
+    const pts = ptsRaw.map(([x, y]) => ({ x, y }));
     const boundaryOnly = r.boundaryOnly === true;
     const muted = boundaryOnly ? false : opts.muted;
     ctx.save();
     ctx.translate(sc.x, sc.y);
     ctx.rotate((r.rotation || 0) * Math.PI / 180);
-    tracePoly(ctx, pts);
+    tracePoly(ctx, ptsRaw);
     if (opts.fill && !boundaryOnly) {
       ctx.globalAlpha = muted ? 0.15 : 0.55; // 強調対象外は薄く塗る
       ctx.fillStyle = r.color;
@@ -333,7 +379,11 @@
     ctx.strokeStyle = opts.selected ? '#d32f2f'
       : (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333')));
     if (boundaryOnly) ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
-    ctx.stroke();
+    strokeVisibleEdges(ctx, pts, r);
+    if (opts.selected) {
+      drawSelectedEdgeLabels(ctx, pts, hiddenEdgeSet(r));
+      ctx.setLineDash([]);
+    }
     if (shouldDrawRegionLabel(r)) {
       // ラベル(符号つき)。既定は実寸320mm相当(全体設定・個別指定で調整可)
       ctx.fillStyle = muted ? '#8a8f94' : '#222';

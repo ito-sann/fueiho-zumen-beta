@@ -1318,6 +1318,13 @@
         html += `<label class="check-row"><input type="checkbox" data-fieldbool="showDims" ${el.showDims !== false ? 'checked' : ''}> 辺の長さを表示</label>`;
         html += `<label class="check-row"><input type="checkbox" data-fieldbool="showPointLabels" ${el.showPointLabels === true ? 'checked' : ''}> 頂点番号(P1...)を表示</label>`;
       }
+      const edgeCount = regionEdgeCount(el);
+      const hiddenEdges = new Set((el.hiddenEdges || []).map((n) => parseInt(n, 10)));
+      html += '<div class="prop-row"><span>輪郭線</span><div class="check-stack">';
+      for (let i = 0; i < edgeCount; i++) {
+        html += `<label class="check-row"><input type="checkbox" data-region-edge="${i}" ${hiddenEdges.has(i) ? '' : 'checked'}> 辺${i + 1}を表示</label>`;
+      }
+      html += '<button type="button" id="btnShowAllEdges" class="btn small">すべて表示</button></div></div>';
       html += `<label class="check-row"><input type="checkbox" data-fieldbool="showLabel" ${el.showLabel ? 'checked' : ''}> 区画名を図面に表示</label>`;
     } else {
       html = `<div class="prop-row"><span>種別</span><b>${kindLabel(el, kind)}</b></div>`;
@@ -1624,6 +1631,25 @@
     if (boundaryStyle) boundaryStyle.onchange = (e) => { el.boundaryLineStyle = e.target.value; refresh(); showProps(el); };
     const boundaryColor = box.querySelector('#propBoundaryColor');
     if (boundaryColor) boundaryColor.oninput = (e) => { el.boundaryColor = e.target.value; refresh(); };
+    const edgeChecks = Array.from(box.querySelectorAll('[data-region-edge]'));
+    if (edgeChecks.length) {
+      const syncHiddenEdges = () => {
+        const hidden = edgeChecks
+          .filter((inp) => !inp.checked)
+          .map((inp) => parseInt(inp.dataset.regionEdge, 10))
+          .filter((n) => Number.isFinite(n));
+        el.hiddenEdges = hidden;
+        refresh(); showProps(el);
+      };
+      edgeChecks.forEach((inp) => { inp.onchange = syncHiddenEdges; });
+      const showAllEdges = box.querySelector('#btnShowAllEdges');
+      if (showAllEdges) {
+        showAllEdges.onclick = () => {
+          el.hiddenEdges = [];
+          refresh(); showProps(el);
+        };
+      }
+    }
     // 多角形の頂点座標の編集(原点の取り直しがあるため change で確定時に反映)
     box.querySelectorAll('[data-vx], [data-vy]').forEach((inp) => {
       inp.addEventListener('change', (e) => {
@@ -1696,6 +1722,13 @@
 
   function shapeLabel(shape) {
     return { rect: '長方形', triangle: '三角形', trapezoid: '台形', polygon: '多角形' }[shape] || '長方形';
+  }
+
+  function regionEdgeCount(region) {
+    if (!region) return 0;
+    if (region.shape === 'polygon') return (region.points || []).length;
+    if (region.shape === 'triangle') return 3;
+    return 4;
   }
 
   function kindLabel(el, kind) {
