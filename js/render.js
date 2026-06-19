@@ -264,7 +264,7 @@
       ctx.fill();
       ctx.globalAlpha = 1;
     }
-    ctx.lineWidth = opts.selected ? 3 : (boundaryOnly ? Math.max(2, wpx(55)) : 2);
+    ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f'
       : (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333')));
     if (boundaryOnly) ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
@@ -295,15 +295,15 @@
     ctx.restore();
   }
 
-  /* 多角形の寸法表示: 各辺の長さ(m)と頂点番号(P1, P2 …)。
-   * 頂点番号は座標求積表の「点」列と対応する。 */
+  /* 多角形の寸法表示: 各辺の長さ(m)を描く。
+   * P1, P2 … の頂点番号は図面が混みやすいため、明示指定がある場合だけ描く。 */
   function drawPolygonDims(ctx, r, opts) {
     const pts = polygonScreenPts(r);
     if (pts.length < 3) return;
     const edges = global.Geometry.polygonEdgesM(r);
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-    const showPointLabels = !opts || opts.showPointLabels !== false;
+    const showPointLabels = opts && opts.showPointLabels === true;
     ctx.save();
     ctx.font = `${fontPx(240)}px sans-serif`;
     ctx.textAlign = 'center';
@@ -375,7 +375,7 @@
       ctx.fill();
       ctx.globalAlpha = 1;
     }
-    ctx.lineWidth = opts.selected ? 3 : (boundaryOnly ? Math.max(2, wpx(55)) : 2);
+    ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f'
       : (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333')));
     if (boundaryOnly) ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
@@ -400,7 +400,7 @@
   function drawDimension(ctx, r) {
     if (r.shape === 'polygon') {
       drawPolygonDims(ctx, r, {
-        showPointLabels: r.boundaryOnly === true ? r.showPointLabels === true : true,
+        showPointLabels: false,
       });
       return;
     }
