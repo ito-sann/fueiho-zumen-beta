@@ -265,9 +265,10 @@
       ctx.globalAlpha = 1;
     }
     ctx.lineWidth = opts.selected ? 3 : 2;
+    const customStroke = r.boundaryColor || null;
     ctx.strokeStyle = opts.selected ? '#d32f2f'
-      : (opts.neutralStroke || (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333'))));
-    if (boundaryOnly) ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
+      : (opts.neutralStroke || customStroke || (boundaryOnly ? (r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333'))));
+    ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
     strokeVisibleEdges(ctx, pts, r);
     if (shouldDrawRegionLabel(r)) {
       // ラベルは重心に置く(既定320mm相当・全体設定・個別指定で調整可)
@@ -376,9 +377,10 @@
       ctx.globalAlpha = 1;
     }
     ctx.lineWidth = opts.selected ? 3 : 2;
+    const customStroke = r.boundaryColor || null;
     ctx.strokeStyle = opts.selected ? '#d32f2f'
-      : (opts.neutralStroke || (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333'))));
-    if (boundaryOnly) ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
+      : (opts.neutralStroke || customStroke || (boundaryOnly ? (r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333'))));
+    ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
     strokeVisibleEdges(ctx, pts, r);
     if (opts.selected) {
       drawSelectedEdgeLabels(ctx, pts, hiddenEdgeSet(r));
@@ -1741,7 +1743,7 @@
         neutralStroke: currentLayer === 'lighting' ? '#333' : null,
         code,
       });
-      const showRegionDims = !(el.boundaryOnly === true && el.showDims === false);
+      const showRegionDims = el.showDims !== false;
       if (vis.dims && showRegionDims && (vis.dimsAllRegions || isMain(el))) {
         // 客室・調理場求積図では、通路・トイレ・柱などの長さも確認できるよう全区画に寸法を付ける
         drawDimension(ctx, el);

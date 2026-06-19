@@ -1306,18 +1306,14 @@
       const areaOpts = Object.entries(M.AREA_USES).map(([k, v]) =>
         `<option value="${k}"${(el.areaUse || 'auto') === k ? ' selected' : ''}>${v.label}</option>`).join('');
       html += `<div class="prop-row"><span>面積の扱い</span><select id="propAreaUse">${areaOpts}</select></div>`;
-      html += `<label class="check-row"><input type="checkbox" id="propBoundaryOnly" ${el.boundaryOnly ? 'checked' : ''}> 線だけの面積囲いとして表示</label>`;
-      if (el.boundaryOnly) {
-        const lineStyle = el.boundaryLineStyle || 'solid';
-        html += `<div class="prop-row"><span>囲い線種</span><select id="propBoundaryLineStyle">
-          <option value="solid"${lineStyle === 'solid' ? ' selected' : ''}>実線</option>
-          <option value="dotted"${lineStyle === 'dotted' ? ' selected' : ''}>点線</option>
-          <option value="dashed"${lineStyle === 'dashed' ? ' selected' : ''}>破線</option>
-        </select></div>`;
-        html += `<label class="prop-row"><span>囲い線色</span><input type="color" id="propBoundaryColor" value="${el.boundaryColor || boundaryColorForUse(G.areaUseForRegion(el))}"></label>`;
-        html += `<label class="check-row"><input type="checkbox" data-fieldbool="showDims" ${el.showDims !== false ? 'checked' : ''}> 辺の長さを表示</label>`;
-        html += `<label class="check-row"><input type="checkbox" data-fieldbool="showPointLabels" ${el.showPointLabels === true ? 'checked' : ''}> 頂点番号(P1...)を表示</label>`;
-      }
+      html += `<div class="prop-row"><span>線種</span><select id="propBoundaryLineStyle">
+        <option value="solid"${(el.boundaryLineStyle || 'solid') === 'solid' ? ' selected' : ''}>実線</option>
+        <option value="dotted"${el.boundaryLineStyle === 'dotted' ? ' selected' : ''}>点線</option>
+        <option value="dashed"${el.boundaryLineStyle === 'dashed' ? ' selected' : ''}>破線</option>
+      </select></div>`;
+      html += `<label class="prop-row"><span>線色</span>
+        <input type="color" id="propBoundaryColor" value="${el.boundaryColor || '#333333'}"></label>`;
+      html += `<label class="check-row"><input type="checkbox" data-fieldbool="showDims" ${el.showDims !== false ? 'checked' : ''}> 辺の長さを表示</label>`;
       const edgeCount = regionEdgeCount(el);
       const hiddenEdges = new Set((el.hiddenEdges || []).map((n) => parseInt(n, 10)));
       html += '<div class="prop-row"><span>輪郭線</span><div class="check-stack">';
@@ -1611,26 +1607,23 @@
     if (areaUseSel) {
       areaUseSel.onchange = (e) => {
         el.areaUse = e.target.value;
-        if (el.boundaryOnly && !el.boundaryColor) el.boundaryColor = boundaryColorForUse(G.areaUseForRegion(el));
-        refresh(); showProps(el);
-      };
-    }
-    const boundaryOnly = box.querySelector('#propBoundaryOnly');
-    if (boundaryOnly) {
-      boundaryOnly.onchange = (e) => {
-        el.boundaryOnly = e.target.checked;
-        if (el.boundaryOnly) {
-          el.boundaryLineStyle = el.boundaryLineStyle || 'solid';
-          el.boundaryColor = el.boundaryColor || boundaryColorForUse(G.areaUseForRegion(el));
-          if (el.showPointLabels !== true) el.showPointLabels = false;
-        }
         refresh(); showProps(el);
       };
     }
     const boundaryStyle = box.querySelector('#propBoundaryLineStyle');
-    if (boundaryStyle) boundaryStyle.onchange = (e) => { el.boundaryLineStyle = e.target.value; refresh(); showProps(el); };
+    if (boundaryStyle) {
+      boundaryStyle.onchange = (e) => {
+        el.boundaryLineStyle = e.target.value;
+        refresh(); showProps(el);
+      };
+    }
     const boundaryColor = box.querySelector('#propBoundaryColor');
-    if (boundaryColor) boundaryColor.oninput = (e) => { el.boundaryColor = e.target.value; refresh(); };
+    if (boundaryColor) {
+      boundaryColor.oninput = (e) => {
+        el.boundaryColor = e.target.value;
+        refresh();
+      };
+    }
     const edgeChecks = Array.from(box.querySelectorAll('[data-region-edge]'));
     if (edgeChecks.length) {
       const syncHiddenEdges = () => {
