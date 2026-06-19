@@ -16,10 +16,10 @@
   /* ---- 案件ごとの自動保存(localStorage) ----
    * 案件(店舗)ごとに別の控えとしてブラウザ内へ自動保存し、左パネルの
    * 「案件」欄で切り替えられる。ファイルの「保存」ボタンとは別物。 */
-  const CASES_KEY = 'shinya-zumen-cases';     // 案件の一覧(id・名前・更新日時)
-  const CURRENT_KEY = 'shinya-zumen-current'; // 最後に開いていた案件のid
-  const LEGACY_KEY = 'shinya-zumen-autosave'; // 旧版(1案件のみ)の控え
-  const caseKey = (id) => `shinya-zumen-case-${id}`;
+  const CASES_KEY = 'fueiho-zumen-beta-cases';     // 案件の一覧(id・名前・更新日時)
+  const CURRENT_KEY = 'fueiho-zumen-beta-current'; // 最後に開いていた案件のid
+  const LEGACY_KEY = 'fueiho-zumen-beta-autosave'; // 旧版(1案件のみ)の控え
+  const caseKey = (id) => `fueiho-zumen-beta-case-${id}`;
   let currentCaseId = null;
   let autosaveTimer = null;
 
@@ -1761,7 +1761,7 @@
       return;
     }
     const data = {
-      app: 'shinya-zumen',
+      app: 'fueiho-zumen-beta',
       type: 'backup',
       version: 1,
       exportedAt: new Date().toISOString(),
@@ -1771,7 +1771,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `深夜酒類図面_全案件バックアップ_${M.todayStr()}.json`;
+    a.download = `風営法図面アプリ_全案件バックアップ_${M.todayStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
