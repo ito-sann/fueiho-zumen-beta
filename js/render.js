@@ -266,7 +266,7 @@
     }
     ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f'
-      : (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333')));
+      : (opts.neutralStroke || (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333'))));
     if (boundaryOnly) ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
     strokeVisibleEdges(ctx, pts, r);
     if (shouldDrawRegionLabel(r)) {
@@ -377,7 +377,7 @@
     }
     ctx.lineWidth = opts.selected ? 3 : 2;
     ctx.strokeStyle = opts.selected ? '#d32f2f'
-      : (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333')));
+      : (opts.neutralStroke || (boundaryOnly ? (r.boundaryColor || r.color || '#333') : (muted ? '#9aa0a6' : (opts.stroke || '#333'))));
     if (boundaryOnly) ctx.setLineDash(lineDashFor(r.boundaryLineStyle || 'solid'));
     strokeVisibleEdges(ctx, pts, r);
     if (opts.selected) {
@@ -1738,6 +1738,7 @@
         muted: !isMain(el),
         selected: state.selectedId === el.id,
         stroke: strokeFor(el, project),
+        neutralStroke: currentLayer === 'lighting' ? '#333' : null,
         code,
       });
       const showRegionDims = !(el.boundaryOnly === true && el.showDims === false);
