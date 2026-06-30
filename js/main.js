@@ -974,7 +974,7 @@
     });
     (project.furniture || []).forEach((f) => push('備品', 'furniture', f, f.label || (M.FURNITURE_CATALOG[f.kind] || {}).label || '備品', `${G.fmtM(f.w)}×${G.fmtM(f.h)}m`));
     (project.fittings || []).forEach((g) => push('建具・壁', 'fittings', g, g.label || (M.FITTING_CATALOG[g.kind] || {}).label || '建具', `${G.fmtM(g.w)}m`));
-    (project.fixtures || []).forEach((x) => push('照明・音響', 'fixtures', x, (M.FIXTURE_CATALOG[x.kind] || {}).label || '設備', (M.FIXTURE_CATALOG[x.kind] || {}).symbol || ''));
+    (project.fixtures || []).forEach((x) => push('照明・音響', 'fixtures', x, (M.FIXTURE_CATALOG[x.kind] || {}).label || '設備', G.fixtureSymbol(project, x)));
     (project.notes || []).forEach((n) => push('メモ', 'notes', n, n.leader === false ? 'コメント' : 'メモ', (n.text || '').split('\n')[0] || ''));
     return rows;
   }
@@ -995,11 +995,24 @@
         html += `<div class="element-group-title">${esc(group)}</div>`;
       }
       const active = state.selectedId === row.el.id ? ' active' : '';
-      html += `<div class="element-row${active}" data-select-id="${esc(row.el.id)}">
+      const fixtureTypeValue = row.kind === 'fixtures'
+        ? (G.normalizeFixtureTypeCode
+          ? G.normalizeFixtureTypeCode(row.el.typeCode)
+          : String(row.el.typeCode || '').trim().toUpperCase())
+        : '';
+      if (row.kind === 'fixtures' && row.el.typeCode !== fixtureTypeValue) row.el.typeCode = fixtureTypeValue;
+      const fixtureTypeControl = row.kind === 'fixtures'
+        ? `<label class="element-type-code" title="タイプ記号。空欄なら自動、Aなら図面記号はDL-Aのようになります。">
+            <span>タイプ</span>
+            <input type="text" data-fixture-type-id="${esc(row.el.id)}" value="${esc(fixtureTypeValue)}" placeholder="自動" maxlength="6">
+          </label>`
+        : '';
+      html += `<div class="element-row${row.kind === 'fixtures' ? ' has-type-code' : ''}${active}" data-select-id="${esc(row.el.id)}">
         <button type="button" class="element-main" data-select-id="${esc(row.el.id)}">
           <span class="element-name">${esc(row.label)}</span>
           <span class="element-sub">${esc(row.sub || '')}</span>
         </button>
+        ${fixtureTypeControl}
         <button type="button" class="element-delete" data-delete-id="${esc(row.el.id)}">削除</button>
       </div>`;
     }
@@ -1025,6 +1038,26 @@
         }
         refresh();
       };
+    });
+    box.querySelectorAll('[data-fixture-type-id]').forEach((inp) => {
+      const applyTypeCode = () => {
+        const found = M.findById(project, inp.dataset.fixtureTypeId);
+        if (!found || found.kind !== 'fixtures') return;
+        const value = G.normalizeFixtureTypeCode
+          ? G.normalizeFixtureTypeCode(inp.value)
+          : String(inp.value || '').trim().toUpperCase();
+        inp.value = value;
+        found.element.typeCode = value;
+        state.selectedId = found.element.id;
+        draw();
+        renderKyuseki();
+        showProps(found.element);
+        scheduleAutosave();
+        scheduleHistory();
+      };
+      inp.addEventListener('click', (e) => e.stopPropagation());
+      inp.addEventListener('input', (e) => { e.stopPropagation(); applyTypeCode(); });
+      inp.addEventListener('change', () => { applyTypeCode(); renderElementList(); });
     });
   }
 
