@@ -1461,7 +1461,11 @@
       html += '<p class="muted">押すと備品姿図に切り替わります。姿図の正面/側面の四角に重ねて、横から見た形をクリックでなぞってください(Enterで確定)。</p>';
     }
     if (kind === 'fixtures') {
-      html += propText('タイプ記号', 'typeCode', el.typeCode || '');
+      const typeCode = G.normalizeFixtureTypeCode
+        ? G.normalizeFixtureTypeCode(el.typeCode)
+        : String(el.typeCode || '').trim().toUpperCase();
+      if (el.typeCode !== typeCode) el.typeCode = typeCode;
+      html += propText('タイプ記号', 'typeCode', typeCode);
       html += '<p class="muted">例: A と入れると図面記号は DL-A。空欄なら単一仕様は DL、複数仕様は自動で A/B/C を付けます。</p>';
       html += propText('ワット数', 'watt', el.watt || '');
       html += propText('型番メモ', 'model', el.model || '');

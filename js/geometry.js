@@ -574,13 +574,27 @@
       if (x.watt) g.watts.add(String(x.watt).trim());
       if (x.model) g.models.add(String(x.model).trim());
     }
-    const seenByKind = {};
+    const usedSuffixByKind = {};
     for (const g of groups) {
-      seenByKind[g.kind] = seenByKind[g.kind] || 0;
+      if (!g.typeCode) continue;
+      usedSuffixByKind[g.kind] = usedSuffixByKind[g.kind] || new Set();
+      usedSuffixByKind[g.kind].add(g.typeCode);
+    }
+    const nextAutoSuffix = (kind) => {
+      usedSuffixByKind[kind] = usedSuffixByKind[kind] || new Set();
+      let index = 0;
+      let suffix = alphaCode(index);
+      while (usedSuffixByKind[kind].has(suffix)) {
+        index++;
+        suffix = alphaCode(index);
+      }
+      usedSuffixByKind[kind].add(suffix);
+      return suffix;
+    };
+    for (const g of groups) {
       const needsSuffix = (countsByKind[g.kind] || 0) > 1;
-      g.suffix = g.typeCode || (needsSuffix ? alphaCode(seenByKind[g.kind]) : '');
+      g.suffix = g.typeCode || (needsSuffix ? nextAutoSuffix(g.kind) : '');
       g.symbol = g.baseSymbol + (g.suffix ? '-' + g.suffix : '');
-      seenByKind[g.kind]++;
     }
     return groups;
   }
