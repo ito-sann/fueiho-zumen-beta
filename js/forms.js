@@ -78,30 +78,18 @@
     return PREFECTURES.find((p) => a.indexOf(p) === 0) || '';
   }
 
-  /* fixtures を指定した kind 群で絞り込み、種類ごとに
-   * 「ダウンライト×4(60W)」のように集計した文字列を返す。
-   * watt は空でない値を重複なく集めて併記する。該当なしなら空文字。 */
+  /* fixtures を指定した kind 群で絞り込み、種類+仕様ごとに
+   * 「ダウンライトAタイプ×4(60W)」のように集計した文字列を返す。
+   * 同じ種類が単一仕様なら A/B は付けない。 */
   function fixtureSummaryText(project, kinds) {
-    const catalog = global.Model.FIXTURE_CATALOG;
     const summaries = global.Geometry.fixtureSummary(project)
       .filter((g) => kinds.indexOf(g.kind) >= 0);
-    const agg = {};
-    for (const g of summaries) {
-      agg[g.kind] = {
-        count: g.count,
-        watts: String(g.watt || '').split(',').map((w) => w.trim()).filter(Boolean),
-      };
-    }
-    const parts = [];
-    for (const kind of kinds) {
-      const a = agg[kind];
-      if (!a) continue;
-      const label = (catalog[kind] || {}).label || kind;
-      let text = `${label}×${a.count}`;
-      if (a.watts.length) text += `(${a.watts.join('・')}W)`;
-      parts.push(text);
-    }
-    return parts.join('、');
+    return summaries.map((g) => {
+      let text = `${g.label}${g.suffix ? g.suffix + 'タイプ' : ''}×${g.count}`;
+      if (g.watt) text += `(${String(g.watt).split(',').map((w) => w.trim()).filter(Boolean).join('・')}W)`;
+      if (g.model) text += `［${g.model}］`;
+      return text;
+    }).join('、');
   }
 
   /* ---------------------------------------------------------------------

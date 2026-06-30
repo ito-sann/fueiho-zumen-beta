@@ -655,10 +655,10 @@
     tip(x2, y2, 1); tip(x1, y1, -1);
   }
 
-  function drawFixture(ctx, x, opts) {
+  function drawFixture(ctx, x, opts, project) {
     const p = worldToScreen(x.x, x.y);
     const r = wpx(220); // アイコン半径(実寸220mm相当・図面に対して固定)
-    const sym = (global.Model.FIXTURE_CATALOG[x.kind] || {}).symbol || '?';
+    const sym = global.Geometry.fixtureSymbol(project, x);
     ctx.save();
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
@@ -676,7 +676,7 @@
     ctx.restore();
   }
 
-  /* 照明・音響設備図の右下: 設備一覧表(記号・設備・数量・W数)と
+  /* 照明・音響設備図の右下: 設備一覧表(記号・設備・数量・W数・型番)と
    * 自由記入のコメント(meta.lightingNote)を、求積表と同じ白枠の表で描く。 */
   function drawFixtureLegend(ctx, canvas, project) {
     const list = global.Geometry.fixtureSummary(project);
@@ -684,9 +684,9 @@
     if (!list.length && !note) return;
     const table = list.length ? {
       title: '照明・音響設備一覧表',
-      cols: ['記号', '設備', '数量', 'W数'],
-      align: ['center', 'left', 'right', 'right'],
-      rows: list.map((g) => [g.symbol, g.label, String(g.count), g.watt ? g.watt : '—']),
+      cols: ['記号', '設備', '数量', 'W数', '型番/メモ'],
+      align: ['center', 'left', 'right', 'right', 'left'],
+      rows: list.map((g) => [g.symbol, g.label, String(g.count), g.watt ? g.watt : '—', g.model ? g.model : '—']),
     } : null;
     drawCornerTables(ctx, canvas, project, table ? [table] : [], note ? note.split('\n') : [], 'lighting');
   }
@@ -1779,7 +1779,7 @@
           drawFurniture(ctx, el, { selected: state.selectedId === el.id, num: furnitureNums[el.id] });
         }
       } else if (item.kind === 'fixtures') {
-        if (vis.fixtures) drawFixture(ctx, el, { selected: state.selectedId === el.id });
+        if (vis.fixtures) drawFixture(ctx, el, { selected: state.selectedId === el.id }, project);
       } else if (item.kind === 'dimensions') {
         if (dimVisibleOnLayer(el, currentLayer)) drawManualDim(ctx, el, { selected: state.selectedId === el.id });
       } else if (item.kind === 'notes') {

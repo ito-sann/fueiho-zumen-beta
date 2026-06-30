@@ -1074,14 +1074,14 @@
         : `自動集計: ${g.autoCount}。数字を入れると手入力できます`;
       return `<tr><td>${esc(g.symbol)}</td><td>${esc(g.label)}</td>
         <td><input type="number" min="0" step="1" class="fixture-count-input"
-          data-fixture-count="${esc(g.kind)}" value="${g.count}" title="${esc(title)}"></td>
-        <td>${esc(g.watt || '—')}</td></tr>`;
+          data-fixture-count="${esc(g.key)}" data-fixture-kind="${esc(g.kind)}" value="${g.count}" title="${esc(title)}"></td>
+        <td>${esc(g.watt || '—')}</td><td>${esc(g.model || '—')}</td></tr>`;
     }).join('');
-    if (!rows) rows = '<tr><td colspan="4" class="muted">設備がありません</td></tr>';
+    if (!rows) rows = '<tr><td colspan="5" class="muted">設備がありません</td></tr>';
     return `
       <div class="kyuseki-title">照明・音響設備一覧表</div>
       <table class="kyuseki">
-        <thead><tr><th>記号</th><th>設備</th><th>数量</th><th>W数</th></tr></thead>
+        <thead><tr><th>記号</th><th>設備</th><th>数量</th><th>W数</th><th>型番/メモ</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
   }
@@ -1198,9 +1198,11 @@
     $('kyusekiBox').querySelectorAll('[data-fixture-count]').forEach((inp) => {
       inp.addEventListener('input', (e) => {
         const kind = e.target.dataset.fixtureCount;
+        const legacyKind = e.target.dataset.fixtureKind;
         project.meta.fixtureCountOverrides = project.meta.fixtureCountOverrides || {};
         if (e.target.value === '') {
           delete project.meta.fixtureCountOverrides[kind];
+          if (legacyKind) delete project.meta.fixtureCountOverrides[legacyKind];
         } else {
           const n = Math.max(0, Math.round(parseFloat(e.target.value) || 0));
           project.meta.fixtureCountOverrides[kind] = n;

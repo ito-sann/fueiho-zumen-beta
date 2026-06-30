@@ -25,13 +25,13 @@
   function fixtureTableHtml(project) {
     const list = global.Geometry.fixtureSummary(project);
     let rows = list.map((g) =>
-      `<tr><td>${escapeHtml(g.symbol)}</td><td>${escapeHtml(g.label)}</td><td class="num">${g.count}</td><td>${escapeHtml(g.watt || '—')}</td></tr>`
+      `<tr><td>${escapeHtml(g.symbol)}</td><td>${escapeHtml(g.label)}</td><td class="num">${g.count}</td><td>${escapeHtml(g.watt || '—')}</td><td>${escapeHtml(g.model || '—')}</td></tr>`
     ).join('');
-    if (!rows) rows = '<tr><td colspan="4">設備なし</td></tr>';
+    if (!rows) rows = '<tr><td colspan="5">設備なし</td></tr>';
     return `
       <table class="kyuseki">
         <caption>照明・音響設備一覧表</caption>
-        <thead><tr><th>記号</th><th>設備</th><th>数量</th><th>W数</th></tr></thead>
+        <thead><tr><th>記号</th><th>設備</th><th>数量</th><th>W数</th><th>型番/メモ</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
   }

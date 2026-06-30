@@ -505,28 +505,99 @@
       .filter((x) => x.area < KYAKUSHITSU_MIN_SQM);
   }
 
-  /* 照明・音響設備の一覧表(種類ごとに数量・ワット数を集計)。
-   * 照明・音響設備図に添える「設備一覧表」のデータになる。 */
-  function fixtureSummary(project) {
+  function fixtureBaseSymbol(fixture) {
     const cat = global.Model.FIXTURE_CATALOG;
-    const map = new Map();
-    const overrides = (project.meta && project.meta.fixtureCountOverrides) || {};
-    for (const x of project.fixtures) {
-      if (!map.has(x.kind)) {
-        const c = cat[x.kind] || {};
-        map.set(x.kind, { kind: x.kind, label: c.label || x.label, symbol: c.symbol || '?', autoCount: 0, watts: new Set() });
-      }
-      const g = map.get(x.kind);
-      g.autoCount++;
-      if (x.watt) g.watts.add(String(x.watt));
+    const c = cat[fixture.kind] || {};
+    return c.symbol || '?';
+  }
+
+  function fixtureSpecKey(fixture) {
+    const cat = global.Model.FIXTURE_CATALOG;
+    const c = cat[fixture.kind] || {};
+    const label = String(fixture.label || c.label || fixture.kind || '').trim();
+    const watt = String(fixture.watt || '').trim();
+    const model = String(fixture.model || '').trim();
+    return [fixture.kind || '', label, watt, model].join('\u001f');
+  }
+
+  function fixtureCountKey(fixture) {
+    return fixtureSpecKey(fixture);
+  }
+
+  function alphaCode(index) {
+    let n = index + 1;
+    let out = '';
+    while (n > 0) {
+      n -= 1;
+      out = String.fromCharCode(65 + (n % 26)) + out;
+      n = Math.floor(n / 26);
     }
-    return Array.from(map.values()).map((g) => {
-      const manual = Object.prototype.hasOwnProperty.call(overrides, g.kind);
-      const count = manual ? Math.max(0, parseInt(overrides[g.kind], 10) || 0) : g.autoCount;
+    return out;
+  }
+
+  function fixtureSpecGroups(project) {
+    const cat = global.Model.FIXTURE_CATALOG;
+    const groups = [];
+    const byKey = new Map();
+    const countsByKind = {};
+    for (const x of (project.fixtures || [])) {
+      const c = cat[x.kind] || {};
+      const key = fixtureSpecKey(x);
+      if (!byKey.has(key)) {
+        const g = {
+          key,
+          kind: x.kind,
+          label: String(x.label || c.label || x.kind || '設備').trim(),
+          baseSymbol: c.symbol || '?',
+          autoCount: 0,
+          watts: new Set(),
+          models: new Set(),
+          fixtures: [],
+        };
+        byKey.set(key, g);
+        groups.push(g);
+        countsByKind[g.kind] = (countsByKind[g.kind] || 0) + 1;
+      }
+      const g = byKey.get(key);
+      g.autoCount++;
+      g.fixtures.push(x);
+      if (x.watt) g.watts.add(String(x.watt).trim());
+      if (x.model) g.models.add(String(x.model).trim());
+    }
+    const seenByKind = {};
+    for (const g of groups) {
+      seenByKind[g.kind] = seenByKind[g.kind] || 0;
+      const needsSuffix = (countsByKind[g.kind] || 0) > 1;
+      g.suffix = needsSuffix ? alphaCode(seenByKind[g.kind]) : '';
+      g.symbol = g.baseSymbol + (g.suffix ? '-' + g.suffix : '');
+      seenByKind[g.kind]++;
+    }
+    return groups;
+  }
+
+  function fixtureSymbol(project, fixture) {
+    const groups = fixtureSpecGroups(project);
+    const key = fixtureSpecKey(fixture);
+    const g = groups.find((item) => item.key === key);
+    return g ? g.symbol : fixtureBaseSymbol(fixture);
+  }
+
+  /* 照明・音響設備の一覧表(種類+仕様ごとに数量・ワット数を集計)。
+   * 同じ種類の仕様違いが複数あるときだけ、記号に A/B/C を付ける。 */
+  function fixtureSummary(project) {
+    const overrides = (project.meta && project.meta.fixtureCountOverrides) || {};
+    return fixtureSpecGroups(project).map((g) => {
+      const hasSpecificOverride = Object.prototype.hasOwnProperty.call(overrides, g.key);
+      const hasLegacyOverride = Object.prototype.hasOwnProperty.call(overrides, g.kind);
+      const manual = hasSpecificOverride || hasLegacyOverride;
+      const overrideKey = hasSpecificOverride ? g.key : g.kind;
+      const count = manual ? Math.max(0, parseInt(overrides[overrideKey], 10) || 0) : g.autoCount;
       return {
-        kind: g.kind, label: g.label, symbol: g.symbol,
+        kind: g.kind, key: g.key, label: g.label,
+        baseSymbol: g.baseSymbol, suffix: g.suffix, symbol: g.symbol,
         count, autoCount: g.autoCount, manualCount: manual,
         watt: Array.from(g.watts).join(', '),
+        model: Array.from(g.models).join(', '),
       };
     });
   }
@@ -580,6 +651,6 @@
     offsetPolygonAbs, premiseCenterlineAbs, premiseWallPolysAbs, premiseRegionLike, premiseCalc,
     furnitureGroups, furnitureNumberMap, furnKey,
     summary, sightlineWarnings, kyakushitsuSizeWarnings, KYAKUSHITSU_MIN_SQM,
-    fixtureSummary, boundingBox,
+    fixtureSummary, fixtureSymbol, fixtureCountKey, boundingBox,
   };
 })(window);
