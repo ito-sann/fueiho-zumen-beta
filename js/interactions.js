@@ -90,22 +90,19 @@
     return Math.abs(lx) <= el.w / 2 && Math.abs(ly) <= el.h / 2;
   }
 
-  function inSwingDoorSymbol(wx, wy, el) {
+  function inSwingDoorOperationSurface(wx, wy, el) {
     if (!el || (el.kind !== 'door' && el.kind !== 'doorDouble')) return false;
     const p = localRotatedPoint(wx, wy, el);
-    const lx = el.flip ? -p.x : p.x;
-    const ly = el.swing ? -p.y : p.y;
     const w = el.w || 0;
     const h = el.h || 0;
-    // 開き扉は線と弧だけで細く見えるため、選択用の掴み代を広めに取る。
-    const pad = Math.max(320, h * 1.5, 18 / global.Render.view.zoom);
+    // 線や弧そのものではなく、扉全体を包む透明な操作面としてつかませる。
+    const pad = Math.max(420, h * 2, 24 / global.Render.view.zoom);
     const openDepth = el.kind === 'doorDouble' ? w / 2 : w;
-    return lx >= -w / 2 - pad && lx <= w / 2 + pad &&
-      ly >= -openDepth - pad && ly <= h / 2 + pad;
+    return Math.abs(p.x) <= w / 2 + pad && Math.abs(p.y) <= openDepth + pad;
   }
 
   function inFittingHitArea(wx, wy, el) {
-    return inRotatedRect(wx, wy, el) || inSwingDoorSymbol(wx, wy, el);
+    return inRotatedRect(wx, wy, el) || inSwingDoorOperationSurface(wx, wy, el);
   }
 
   function inCounterL(wx, wy, el) {
