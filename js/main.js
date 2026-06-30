@@ -1461,6 +1461,8 @@
       html += '<p class="muted">押すと備品姿図に切り替わります。姿図の正面/側面の四角に重ねて、横から見た形をクリックでなぞってください(Enterで確定)。</p>';
     }
     if (kind === 'fixtures') {
+      html += propText('タイプ記号', 'typeCode', el.typeCode || '');
+      html += '<p class="muted">例: A と入れると図面記号は DL-A。空欄なら単一仕様は DL、複数仕様は自動で A/B/C を付けます。</p>';
       html += propText('ワット数', 'watt', el.watt || '');
       html += propText('型番メモ', 'model', el.model || '');
     }
@@ -1526,6 +1528,12 @@
         const f = e.target.dataset.field;
         let v = e.target.value;
         if (e.target.type === 'number') v = parseFloat(v) || 0;
+        if (f === 'typeCode') {
+          v = G.normalizeFixtureTypeCode
+            ? G.normalizeFixtureTypeCode(v)
+            : String(v || '').trim().toUpperCase();
+          e.target.value = v;
+        }
         el[f] = v;
         refresh();
         // 面積表示を即時に更新(幅・奥行の変更に追従)
@@ -1544,6 +1552,16 @@
         }
       });
     });
+    const fixtureTypeInput = box.querySelector('[data-field="typeCode"]');
+    if (fixtureTypeInput) {
+      fixtureTypeInput.addEventListener('change', () => {
+        el.typeCode = G.normalizeFixtureTypeCode
+          ? G.normalizeFixtureTypeCode(el.typeCode)
+          : String(el.typeCode || '').trim().toUpperCase();
+        fixtureTypeInput.value = el.typeCode;
+        refresh(); showProps(el);
+      });
+    }
     // チェックボックス式のプロパティ(扉の開き勝手 flip / swing など)
     box.querySelectorAll('[data-fieldbool]').forEach((inp) => {
       inp.addEventListener('change', (e) => {

@@ -568,6 +568,7 @@
       y: 1500,
       watt: '',
       model: '',
+      typeCode: '',
     };
     project.fixtures.push(item);
     return item;

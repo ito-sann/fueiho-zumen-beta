@@ -511,7 +511,15 @@
     return c.symbol || '?';
   }
 
+  function normalizeFixtureTypeCode(value) {
+    let code = String(value || '').trim();
+    if (code.normalize) code = code.normalize('NFKC');
+    return code.replace(/\s+/g, '').replace(/^-+/, '').toUpperCase();
+  }
+
   function fixtureSpecKey(fixture) {
+    const typeCode = normalizeFixtureTypeCode(fixture.typeCode);
+    if (typeCode) return [fixture.kind || '', 'manual', typeCode].join('\u001f');
     const cat = global.Model.FIXTURE_CATALOG;
     const c = cat[fixture.kind] || {};
     const label = String(fixture.label || c.label || fixture.kind || '').trim();
@@ -544,11 +552,13 @@
       const c = cat[x.kind] || {};
       const key = fixtureSpecKey(x);
       if (!byKey.has(key)) {
+        const typeCode = normalizeFixtureTypeCode(x.typeCode);
         const g = {
           key,
           kind: x.kind,
           label: String(x.label || c.label || x.kind || '設備').trim(),
           baseSymbol: c.symbol || '?',
+          typeCode,
           autoCount: 0,
           watts: new Set(),
           models: new Set(),
@@ -568,7 +578,7 @@
     for (const g of groups) {
       seenByKind[g.kind] = seenByKind[g.kind] || 0;
       const needsSuffix = (countsByKind[g.kind] || 0) > 1;
-      g.suffix = needsSuffix ? alphaCode(seenByKind[g.kind]) : '';
+      g.suffix = g.typeCode || (needsSuffix ? alphaCode(seenByKind[g.kind]) : '');
       g.symbol = g.baseSymbol + (g.suffix ? '-' + g.suffix : '');
       seenByKind[g.kind]++;
     }
@@ -595,6 +605,7 @@
       return {
         kind: g.kind, key: g.key, label: g.label,
         baseSymbol: g.baseSymbol, suffix: g.suffix, symbol: g.symbol,
+        typeCode: g.typeCode,
         count, autoCount: g.autoCount, manualCount: manual,
         watt: Array.from(g.watts).join(', '),
         model: Array.from(g.models).join(', '),
@@ -651,6 +662,6 @@
     offsetPolygonAbs, premiseCenterlineAbs, premiseWallPolysAbs, premiseRegionLike, premiseCalc,
     furnitureGroups, furnitureNumberMap, furnKey,
     summary, sightlineWarnings, kyakushitsuSizeWarnings, KYAKUSHITSU_MIN_SQM,
-    fixtureSummary, fixtureSymbol, fixtureCountKey, boundingBox,
+    fixtureSummary, fixtureSymbol, fixtureCountKey, normalizeFixtureTypeCode, boundingBox,
   };
 })(window);

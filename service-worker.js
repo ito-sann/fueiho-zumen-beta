@@ -1,17 +1,17 @@
-const CACHE_NAME = 'fueiho-zumen-beta-v1.49.1';
+const CACHE_NAME = 'fueiho-zumen-beta-v1.49.2';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
   './icons/app-icon.svg',
-  './css/style.css?v=1.49.1',
-  './js/model.js?v=1.49.1',
-  './js/geometry.js?v=1.49.1',
-  './js/render.js?v=1.49.1',
-  './js/interactions.js?v=1.49.1',
-  './js/print.js?v=1.49.1',
-  './js/forms.js?v=1.49.1',
-  './js/main.js?v=1.49.1',
+  './css/style.css?v=1.49.2',
+  './js/model.js?v=1.49.2',
+  './js/geometry.js?v=1.49.2',
+  './js/render.js?v=1.49.2',
+  './js/interactions.js?v=1.49.2',
+  './js/print.js?v=1.49.2',
+  './js/forms.js?v=1.49.2',
+  './js/main.js?v=1.49.2',
 ];
 
 self.addEventListener('install', (event) => {
